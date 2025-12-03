@@ -43,6 +43,7 @@ class ScrapingWorker(QThread):
             app_config.set('scraping.sleep_min', self.config_dict['sleep_min'])
             app_config.set('scraping.sleep_max', self.config_dict['sleep_max'])
             app_config.set('scraping.parallel_count', self.config_dict['parallel_count'])
+            app_config.set('scraping.fetch_pedigree', self.config_dict.get('fetch_pedigree', False))
 
             # スクレイパーの初期化
             self.scraper = NetkeibaScraper(self.db_manager, app_config)
@@ -53,6 +54,7 @@ class ScrapingWorker(QThread):
 
             self.log_message.emit(f"期間: {start_date.date()} ～ {end_date.date()}")
             self.log_message.emit(f"スリープ時間: {self.config_dict['sleep_min']}～{self.config_dict['sleep_max']}秒")
+            self.log_message.emit(f"血統情報取得: {'有効' if self.config_dict.get('fetch_pedigree', False) else '無効'}")
 
             # 進捗コールバック
             def progress_callback(current, total, message):

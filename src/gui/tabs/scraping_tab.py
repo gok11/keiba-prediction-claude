@@ -6,7 +6,7 @@ db.netkeiba.comからレースデータを収集するUI
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QPushButton, QLabel, QSpinBox, QDoubleSpinBox,
-    QProgressBar, QTextEdit, QDateEdit, QMessageBox
+    QProgressBar, QTextEdit, QDateEdit, QMessageBox, QCheckBox
 )
 from PyQt6.QtCore import QDate, QThread, pyqtSignal
 from datetime import datetime
@@ -85,6 +85,15 @@ class ScrapingTab(QWidget):
         parallel_layout.addStretch()
         settings_layout.addLayout(parallel_layout)
 
+        # 血統情報取得オプション
+        pedigree_layout = QHBoxLayout()
+        self.fetch_pedigree = QCheckBox("血統情報を取得する（追加リクエストが必要）")
+        self.fetch_pedigree.setChecked(False)
+        pedigree_layout.addWidget(self.fetch_pedigree)
+        pedigree_layout.addWidget(QLabel("※リクエスト数が大幅に増えます"))
+        pedigree_layout.addStretch()
+        settings_layout.addLayout(pedigree_layout)
+
         layout.addWidget(settings_group)
 
         # コントロールボタン
@@ -152,12 +161,16 @@ class ScrapingTab(QWidget):
             'end_date': self.end_date.date().toString("yyyy-MM-dd"),
             'sleep_min': self.sleep_min.value(),
             'sleep_max': self.sleep_max.value(),
-            'parallel_count': self.parallel_count.value()
+            'parallel_count': self.parallel_count.value(),
+            'fetch_pedigree': self.fetch_pedigree.isChecked()
         }
 
         self.add_log(f"期間: {config['start_date']} ～ {config['end_date']}")
         self.add_log(f"スリープ時間: {config['sleep_min']}～{config['sleep_max']}秒")
         self.add_log(f"並行処理数: {config['parallel_count']}")
+        self.add_log(f"血統情報取得: {'有効' if config['fetch_pedigree'] else '無効'}")
+        if config['fetch_pedigree']:
+            self.add_log("⚠️  血統情報取得が有効です。リクエスト数が増加します。")
         self.add_log("=" * 50)
 
         # スクレイピングワーカーの作成と起動

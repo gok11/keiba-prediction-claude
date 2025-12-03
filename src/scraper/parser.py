@@ -195,6 +195,18 @@ class NetkeibaParser:
                 # 着差
                 margin = cols[8].text.strip()
 
+                # 通過順位
+                passing_order = cols[9].text.strip() if len(cols) > 9 else ""
+
+                # 上がり3ハロン（秒）
+                last_3f_text = cols[10].text.strip() if len(cols) > 10 else ""
+                last_3f = None
+                if last_3f_text:
+                    try:
+                        last_3f = float(last_3f_text)
+                    except:
+                        pass
+
                 # 人気
                 popularity_text = cols[11].text.strip() if len(cols) > 11 else ""
                 try:
@@ -208,6 +220,21 @@ class NetkeibaParser:
                     odds_win = float(odds_text)
                 except:
                     odds_win = None
+
+                # 複勝オッズ（範囲の場合は平均値を使用）
+                odds_place = None
+                if len(cols) > 13:
+                    odds_place_text = cols[13].text.strip()
+                    if odds_place_text and odds_place_text != '---':
+                        try:
+                            # "2.1-3.4" のような範囲の場合
+                            if '-' in odds_place_text:
+                                parts = odds_place_text.split('-')
+                                odds_place = (float(parts[0]) + float(parts[1])) / 2
+                            else:
+                                odds_place = float(odds_place_text)
+                        except:
+                            pass
 
                 # 馬体重
                 weight_text = cols[14].text.strip() if len(cols) > 14 else ""
@@ -246,9 +273,12 @@ class NetkeibaParser:
                     'horse_weight': horse_weight,
                     'horse_weight_diff': horse_weight_diff,
                     'odds_win': odds_win,
+                    'odds_place': odds_place,
                     'popularity': popularity,
                     'time': time_seconds,
                     'margin': margin,
+                    'passing_order': passing_order,
+                    'last_3f': last_3f,
                     'sex': sex,
                     'age': age
                 }
@@ -259,6 +289,76 @@ class NetkeibaParser:
             print(f"レース結果パースエラー: {e}")
 
         return results
+
+    @staticmethod
+    def parse_payouts(html: str, race_id: str) -> List[Dict[str, Any]]:
+        """
+        払戻金情報をパース
+
+        Args:
+            html: レースページのHTML
+            race_id: レースID
+
+        Returns:
+            払戻金情報のリスト
+        """
+        soup = BeautifulSoup(html, 'lxml')
+        payouts = []
+
+        try:
+            # 払戻金テーブルを取得
+            payout_table = soup.find('table', class_='Payout')
+            if not payout_table:
+                return payouts
+
+            rows = payout_table.find_all('tr')
+
+            for row in rows:
+                # 払戻タイプ（単勝、複勝など）
+                th = row.find('th')
+                if not th:
+                    continue
+
+                payout_type = th.text.strip()
+
+                # 払戻データ
+                tds = row.find_all('td')
+                if len(tds) < 2:
+                    continue
+
+                # 組み合わせ（馬番）
+                combination_td = tds[0]
+                combination = combination_td.text.strip()
+
+                # 払戻金額
+                payout_td = tds[1]
+                payout_text = payout_td.text.strip().replace(',', '').replace('円', '')
+                try:
+                    payout_amount = int(payout_text)
+                except:
+                    continue
+
+                # 人気
+                popularity = None
+                if len(tds) > 2:
+                    popularity_text = tds[2].text.strip().replace('番人気', '')
+                    try:
+                        popularity = int(popularity_text)
+                    except:
+                        pass
+
+                payouts.append({
+                    'race_id': race_id,
+                    'payout_type': payout_type,
+                    'combination': combination,
+                    'payout': payout_amount,
+                    'popularity': popularity
+                })
+
+        except Exception as e:
+            print(f"払戻金パースエラー: {e}")
+
+        return payouts
 
     @staticmethod
     def parse_odds(html: str, race_id: str) -> Dict[str, List[Dict[str, Any]]]:

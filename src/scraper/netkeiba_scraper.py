@@ -50,6 +50,7 @@ class NetkeibaScraper:
         self.sleep_max = self.config.get('scraping.sleep_max', 5.0)
         self.user_agent = self.config.get('scraping.user_agent', 'Mozilla/5.0')
         self.timeout = self.config.get('scraping.timeout', 30)
+        self.fetch_pedigree = self.config.get('scraping.fetch_pedigree', False)
 
         # セッション設定
         self.session = requests.Session()
@@ -132,12 +133,38 @@ class NetkeibaScraper:
 
         return f"{year}{times_str}{day_str}{venue_str}{race_str}"
 
-    def scrape_race(self, race_id: str) -> bool:
+    def scrape_horse_pedigree(self, horse_id: str) -> Optional[Dict[str, Any]]:
+        """
+        馬の血統情報をスクレイピング
+
+        Args:
+            horse_id: 馬ID
+
+        Returns:
+            血統情報の辞書
+        """
+        url = urljoin(self.base_url, f"horse/{horse_id}/")
+        html = self.fetch_url(url)
+
+        if not html:
+            return None
+
+        # 血統情報をパース
+        pedigree = self.parser.parse_horse_pedigree(html, horse_id)
+
+        if pedigree:
+            self.logger.debug(f"Fetched pedigree for horse {horse_id}")
+            return pedigree
+
+        return None
+
+    def scrape_race(self, race_id: str, fetch_pedigree: bool = False) -> bool:
         """
         特定のレースをスクレイピング
 
         Args:
             race_id: レースID
+            fetch_pedigree: 血統情報も取得するか（追加リクエストが必要）
 
         Returns:
             成功したかどうか
@@ -160,6 +187,9 @@ class NetkeibaScraper:
             self.logger.warning(f"No race results found: {race_id}")
             return False
 
+        # 払戻金情報をパース
+        payouts = self.parser.parse_payouts(html, race_id)
+
         # データベースに保存
         try:
             # レース情報を保存
@@ -169,15 +199,27 @@ class NetkeibaScraper:
 
             # レース結果を保存
             for result in race_results:
+                # 血統情報を取得（オプション）
+                sire = None
+                dam = None
+                damsire = None
+
+                if fetch_pedigree and result.get('horse_id'):
+                    pedigree = self.scrape_horse_pedigree(result['horse_id'])
+                    if pedigree:
+                        sire = pedigree.get('sire')
+                        dam = pedigree.get('dam')
+                        damsire = pedigree.get('damsire')
+
                 # 馬情報を保存
                 horse_data = {
                     'horse_id': result['horse_id'],
                     'horse_name': result['horse_name'],
                     'sex': result.get('sex'),
                     'birth_date': None,  # 詳細ページから取得が必要
-                    'sire': None,
-                    'dam': None,
-                    'damsire': None,
+                    'sire': sire,
+                    'dam': dam,
+                    'damsire': damsire,
                     'breeder': None,
                     'owner': None
                 }
@@ -187,7 +229,18 @@ class NetkeibaScraper:
                 if self.db_manager.insert_race_result(result):
                     self.stats['results_saved'] += 1
 
-            self.logger.info(f"Saved {len(race_results)} results for race {race_id}")
+            # 払戻金情報を保存
+            for payout in payouts:
+                self.db_manager.execute_update(
+                    """
+                    INSERT INTO payouts (race_id, payout_type, combination, payout, popularity)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (payout['race_id'], payout['payout_type'], payout['combination'],
+                     payout['payout'], payout.get('popularity'))
+                )
+
+            self.logger.info(f"Saved {len(race_results)} results and {len(payouts)} payouts for race {race_id}")
             return True
 
         except Exception as e:
@@ -225,7 +278,7 @@ class NetkeibaScraper:
             if progress_callback:
                 progress_callback(idx, total_candidates, f"Scraping race {race_id}")
 
-            self.scrape_race(race_id)
+            self.scrape_race(race_id, fetch_pedigree=self.fetch_pedigree)
 
             # 定期的に統計をログ出力
             if idx % 50 == 0:
