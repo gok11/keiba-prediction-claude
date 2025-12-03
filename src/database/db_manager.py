@@ -33,7 +33,18 @@ class DatabaseManager:
         if self.connection is None:
             self.connection = sqlite3.connect(self.db_path)
             self.connection.row_factory = sqlite3.Row  # 辞書形式でアクセス可能に
+            # データベースが初期化されていない場合は自動初期化
+            self._auto_initialize_if_needed()
         return self.connection
+
+    def _auto_initialize_if_needed(self):
+        """データベースが未初期化の場合、自動的に初期化する"""
+        cursor = self.connection.cursor()
+        # racesテーブルの存在をチェック
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='races'")
+        if cursor.fetchone() is None:
+            print("データベースが初期化されていません。自動初期化を実行します...")
+            self.initialize_database()
 
     def disconnect(self):
         """データベース接続を切断"""

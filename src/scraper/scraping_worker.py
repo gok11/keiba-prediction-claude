@@ -53,7 +53,7 @@ class ScrapingWorker(QThread):
 
             self.log_message.emit(f"期間: {start_date.date()} ～ {end_date.date()}")
             self.log_message.emit(f"スリープ時間: {self.config_dict['sleep_min']}～{self.config_dict['sleep_max']}秒")
-            self.log_message.emit(f"血統情報取得: {'有効' if self.config_dict.get('fetch_pedigree', False) else '無効'}")
+            self.log_message.emit(f"血統情報取得: {'有効' if self.config_dict.get('fetch_pedigree', True) else '無効'}")
 
             # 進捗コールバック
             def progress_callback(current, total, message):
