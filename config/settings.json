@@ -1,0 +1,27 @@
+{
+  "app": {
+    "name": "競馬予想システム",
+    "version": "1.0.0"
+  },
+  "database": {
+    "path": "data/keiba.db"
+  },
+  "scraping": {
+    "base_url": "https://db.netkeiba.com/",
+    "sleep_min": 2.0,
+    "sleep_max": 5.0,
+    "parallel_count": 1,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "timeout": 30
+  },
+  "ml": {
+    "default_model": "LightGBM",
+    "test_size": 0.2,
+    "random_state": 42,
+    "cv_folds": 5
+  },
+  "backtest": {
+    "default_bet_amount": 100,
+    "default_bet_type": "単勝"
+  }
+}
