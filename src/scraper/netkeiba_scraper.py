@@ -159,19 +159,20 @@ class NetkeibaScraper:
 
         return None
 
-    def scrape_race(self, race_id: str, fetch_pedigree: bool = False) -> bool:
+    def scrape_race(self, race_id: str, fetch_pedigree: bool = False, skip_db_check: bool = False) -> bool:
         """
         特定のレースをスクレイピング
 
         Args:
             race_id: レースID
             fetch_pedigree: 血統情報も取得するか（追加リクエストが必要）
+            skip_db_check: DBチェックをスキップするか（既にチェック済みの場合）
 
         Returns:
             成功したかどうか
         """
-        # 既に存在するレースはスキップ（リクエスト不要）
-        if self.db_manager.race_exists(race_id):
+        # DBチェックをスキップしない場合のみチェック
+        if not skip_db_check and self.db_manager.race_exists(race_id):
             self.logger.info(f"⏭ Race {race_id} already exists, skipping (no request)")
             self.stats['races_skipped'] += 1
             return True  # スキップは成功とみなす
@@ -276,30 +277,94 @@ class NetkeibaScraper:
         if venues is None:
             venues = list(self.VENUE_CODES.keys())
 
-        # レースID候補を生成
-        race_ids = self._generate_race_id_candidates(start_date, end_date, venues)
-        total_candidates = len(race_ids)
-
-        self.logger.info(f"Generated {total_candidates} race ID candidates")
-
-        # スクレイピング実行
-        for idx, race_id in enumerate(race_ids, 1):
-            if progress_callback:
-                # 進捗メッセージにスキップ数を含める
-                msg = f"Processing {race_id} (Saved: {self.stats['races_saved']}, Skipped: {self.stats['races_skipped']})"
-                progress_callback(idx, total_candidates, msg)
-
-            self.scrape_race(race_id, fetch_pedigree=self.fetch_pedigree)
-
-            # 定期的に統計をログ出力
-            if idx % 100 == 0:
-                self._log_stats()
+        # スクレイピング実行（最適化版）
+        self._scrape_smart(start_date, end_date, venues, progress_callback)
 
         # 最終統計
         self._log_stats()
         self.logger.info("Scraping completed")
 
         return self.stats
+
+    def _scrape_smart(self, start_date: datetime, end_date: datetime,
+                     venues: List[str], progress_callback=None):
+        """
+        最適化されたスクレイピング（1Rチェックで無駄なリクエストを削減）
+
+        Args:
+            start_date: 開始日
+            end_date: 終了日
+            venues: 競馬場リスト
+            progress_callback: 進捗コールバック
+        """
+        processed = 0
+
+        # 年ごとに処理
+        current_year = start_date.year
+        while current_year <= end_date.year:
+            current_date = datetime(current_year, 1, 1)
+
+            # 各競馬場について
+            for venue in venues:
+                venue_code = self.VENUE_CODES.get(venue)
+                if not venue_code:
+                    continue
+
+                # 各開催回（年間最大6回程度）
+                for times in range(1, 7):
+                    # 各開催日（1回の開催で最大8日程度）
+                    for day_count in range(1, 9):
+                        # まず1Rをチェック
+                        race_1_id = self.generate_race_id(current_date, venue_code, 1, day_count, times)
+
+                        if progress_callback:
+                            msg = f"Checking {venue} {current_year} {times}回{day_count}日目 (Saved: {self.stats['races_saved']}, Skipped: {self.stats['races_skipped']})"
+                            processed += 1
+                            # 概算の総数を動的に計算（正確な進捗は難しいので簡易版）
+                            progress_callback(processed, processed + 100, msg)
+
+                        # 1Rが存在しない = この開催日は存在しない
+                        if not self._race_exists_or_fetch(race_1_id):
+                            self.logger.debug(f"Race 1 not found for {venue} {current_year} {times}回{day_count}日目, skipping day")
+                            break  # この開催日の残りレースをスキップ
+
+                        # 1Rが存在したら、2R以降もチェック
+                        for race_num in range(2, 13):
+                            race_id = self.generate_race_id(current_date, venue_code, race_num, day_count, times)
+
+                            if progress_callback:
+                                msg = f"Processing {race_id} (Saved: {self.stats['races_saved']}, Skipped: {self.stats['races_skipped']})"
+                                processed += 1
+                                progress_callback(processed, processed + 100, msg)
+
+                            # レースが存在しなくなったら、この日は終了
+                            if not self._race_exists_or_fetch(race_id):
+                                break
+
+                        # 統計を定期的に出力
+                        if processed % 100 == 0:
+                            self._log_stats()
+
+            current_year += 1
+
+    def _race_exists_or_fetch(self, race_id: str) -> bool:
+        """
+        レースがDBに存在するか、またはフェッチできるかをチェック
+
+        Args:
+            race_id: レースID
+
+        Returns:
+            レースが存在する、またはフェッチに成功した場合True
+        """
+        # DBに存在する場合はスキップ（HTTPリクエスト不要）
+        if self.db_manager.race_exists(race_id):
+            self.logger.info(f"⏭ Race {race_id} already exists, skipping (no request)")
+            self.stats['races_skipped'] += 1
+            return True
+
+        # フェッチを試みる（既にDBチェック済みなのでスキップ）
+        return self.scrape_race(race_id, fetch_pedigree=self.fetch_pedigree, skip_db_check=True)
 
     def _generate_race_id_candidates(self, start_date: datetime, end_date: datetime,
                                     venues: List[str]) -> List[str]:
