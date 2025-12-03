@@ -328,12 +328,16 @@ class NetkeibaScraper:
                             self.logger.debug(f"Race 1 not found for {venue} {current_year} {times}回{day_count}日目, skipping day")
                             break  # この開催日の残りレースをスキップ
 
+                        # 1Rから実際の開催日を取得
+                        race_date = self._get_race_date(race_1_id)
+                        date_str = race_date if race_date else '日付不明'
+
                         # 1Rが存在したら、2R以降もチェック
                         for race_num in range(2, 13):
                             race_id = self.generate_race_id(current_date, venue_code, race_num, day_count, times)
 
                             if progress_callback:
-                                msg = f"Processing {race_id} (Saved: {self.stats['races_saved']}, Skipped: {self.stats['races_skipped']})"
+                                msg = f"Processing {race_id} [{date_str}] (Saved: {self.stats['races_saved']}, Skipped: {self.stats['races_skipped']})"
                                 processed += 1
                                 progress_callback(processed, processed + 100, msg)
 
@@ -365,6 +369,25 @@ class NetkeibaScraper:
 
         # フェッチを試みる（既にDBチェック済みなのでスキップ）
         return self.scrape_race(race_id, fetch_pedigree=self.fetch_pedigree, skip_db_check=True)
+
+    def _get_race_date(self, race_id: str) -> Optional[str]:
+        """
+        レースIDからデータベースの開催日を取得
+
+        Args:
+            race_id: レースID
+
+        Returns:
+            開催日（YYYY-MM-DD形式）、存在しない場合はNone
+        """
+        try:
+            query = "SELECT date FROM races WHERE race_id = ?"
+            result = self.db_manager.execute_query(query, (race_id,))
+            if result and len(result) > 0:
+                return result[0][0]  # date列を返す
+        except Exception as e:
+            self.logger.debug(f"Failed to get race date for {race_id}: {e}")
+        return None
 
     def _generate_race_id_candidates(self, start_date: datetime, end_date: datetime,
                                     venues: List[str]) -> List[str]:
