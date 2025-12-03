@@ -170,9 +170,9 @@ class NetkeibaScraper:
         Returns:
             成功したかどうか
         """
-        # 既に存在するレースはスキップ
+        # 既に存在するレースはスキップ（リクエスト不要）
         if self.db_manager.race_exists(race_id):
-            self.logger.debug(f"Race {race_id} already exists, skipping")
+            self.logger.info(f"⏭ Race {race_id} already exists, skipping (no request)")
             self.stats['races_skipped'] += 1
             return True  # スキップは成功とみなす
 
@@ -180,6 +180,8 @@ class NetkeibaScraper:
         html = self.fetch_url(url)
 
         if not html:
+            # 404エラー等でレースが存在しない場合
+            self.logger.debug(f"Race {race_id} not found (404 or error)")
             return False
 
         # レース情報をパース
@@ -283,12 +285,14 @@ class NetkeibaScraper:
         # スクレイピング実行
         for idx, race_id in enumerate(race_ids, 1):
             if progress_callback:
-                progress_callback(idx, total_candidates, f"Scraping race {race_id}")
+                # 進捗メッセージにスキップ数を含める
+                msg = f"Processing {race_id} (Saved: {self.stats['races_saved']}, Skipped: {self.stats['races_skipped']})"
+                progress_callback(idx, total_candidates, msg)
 
             self.scrape_race(race_id, fetch_pedigree=self.fetch_pedigree)
 
             # 定期的に統計をログ出力
-            if idx % 50 == 0:
+            if idx % 100 == 0:
                 self._log_stats()
 
         # 最終統計
@@ -346,13 +350,19 @@ class NetkeibaScraper:
         self.logger.info(f"Total requests: {self.stats['total_requests']}")
         self.logger.info(f"Successful: {self.stats['successful_requests']}")
         self.logger.info(f"Failed: {self.stats['failed_requests']}")
-        self.logger.info(f"Races saved: {self.stats['races_saved']}")
-        self.logger.info(f"Races skipped: {self.stats['races_skipped']}")
+        self.logger.info(f"✅ Races saved: {self.stats['races_saved']}")
+        self.logger.info(f"⏭ Races skipped (already in DB): {self.stats['races_skipped']}")
         self.logger.info(f"Results saved: {self.stats['results_saved']}")
 
         if self.stats['total_requests'] > 0:
             success_rate = (self.stats['successful_requests'] / self.stats['total_requests']) * 100
             self.logger.info(f"Success rate: {success_rate:.2f}%")
+
+        # スキップ効率を表示
+        total_processed = self.stats['races_saved'] + self.stats['races_skipped']
+        if total_processed > 0:
+            skip_rate = (self.stats['races_skipped'] / total_processed) * 100
+            self.logger.info(f"Skip efficiency: {skip_rate:.1f}% (saved {self.stats['races_skipped']} HTTP requests)")
 
     def close(self):
         """セッションをクローズ"""
