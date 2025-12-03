@@ -11,6 +11,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QDate, QThread, pyqtSignal
 from datetime import datetime
 
+from src.scraper.scraping_worker import ScrapingWorker
+
 
 class ScrapingTab(QWidget):
     """データ収集タブ"""
@@ -158,17 +160,17 @@ class ScrapingTab(QWidget):
         self.add_log(f"並行処理数: {config['parallel_count']}")
         self.add_log("=" * 50)
 
-        # TODO: スクレイピングスレッドの実装
-        # 現在はダミーメッセージ
-        self.add_log("※ スクレイピング機能は次のフェーズで実装されます")
-        self.add_log("  src/scraper/netkeiba_scraper.py を実装後に有効化されます")
+        # スクレイピングワーカーの作成と起動
+        self.scraping_thread = ScrapingWorker(self.db_manager, config)
 
-        # ダミーの進捗更新
-        self.progress_bar.setValue(100)
-        self.progress_label.setText("準備完了（実装待ち）")
+        # シグナルの接続
+        self.scraping_thread.progress_updated.connect(self.on_progress_updated)
+        self.scraping_thread.log_message.connect(self.add_log)
+        self.scraping_thread.scraping_finished.connect(self.on_scraping_finished)
+        self.scraping_thread.scraping_error.connect(self.on_scraping_error)
 
-        self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
+        # スレッド開始
+        self.scraping_thread.start()
 
     def stop_scraping(self):
         """スクレイピングを中止"""
@@ -181,6 +183,35 @@ class ScrapingTab(QWidget):
         self.add_log("中止しました")
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
+
+    def on_progress_updated(self, current: int, total: int, message: str):
+        """進捗更新ハンドラ"""
+        if total > 0:
+            progress = int((current / total) * 100)
+            self.progress_bar.setValue(progress)
+            self.progress_label.setText(f"{current}/{total} - {message}")
+
+    def on_scraping_finished(self, stats: dict):
+        """スクレイピング完了ハンドラ"""
+        self.progress_bar.setValue(100)
+        self.progress_label.setText("完了")
+        self.start_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+
+        QMessageBox.information(
+            self,
+            "スクレイピング完了",
+            f"スクレイピングが完了しました！\n\n"
+            f"総リクエスト数: {stats['total_requests']}\n"
+            f"保存されたレース数: {stats['races_saved']}\n"
+            f"保存された結果数: {stats['results_saved']}"
+        )
+
+    def on_scraping_error(self, error_message: str):
+        """エラーハンドラ"""
+        self.start_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+        QMessageBox.critical(self, "エラー", error_message)
 
     def add_log(self, message: str):
         """ログにメッセージを追加"""
