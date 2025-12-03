@@ -115,6 +115,7 @@ class NetkeibaScraper:
                         day_count: int = 1, times: int = 1) -> str:
         """
         レースIDを生成
+        フォーマット: 年(4) + 競馬場(2) + 回次(2) + 日次(2) + レース番号(2)
 
         Args:
             date: 開催日
@@ -124,15 +125,16 @@ class NetkeibaScraper:
             times: 回次（年何回目の開催か）
 
         Returns:
-            レースID (例: 202301050112)
+            レースID (例: 2023年東京1回2日目12R = 202305010212)
         """
         year = date.strftime('%Y')
+        venue_str = venue_code.zfill(2)
         times_str = str(times).zfill(2)
         day_str = str(day_count).zfill(2)
-        venue_str = venue_code.zfill(2)
         race_str = str(race_number).zfill(2)
 
-        return f"{year}{times_str}{day_str}{venue_str}{race_str}"
+        # 正しい順番: 年 + 競馬場 + 回次 + 日次 + レース番号
+        return f"{year}{venue_str}{times_str}{day_str}{race_str}"
 
     def scrape_horse_pedigree(self, horse_id: str) -> Optional[Dict[str, Any]]:
         """
