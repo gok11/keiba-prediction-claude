@@ -31,7 +31,8 @@ class DatabaseManager:
     def connect(self) -> sqlite3.Connection:
         """データベースに接続"""
         if self.connection is None:
-            self.connection = sqlite3.connect(self.db_path)
+            # check_same_thread=Falseでスレッド間での接続共有を許可
+            self.connection = sqlite3.connect(self.db_path, check_same_thread=False)
             self.connection.row_factory = sqlite3.Row  # 辞書形式でアクセス可能に
             # データベースが初期化されていない場合は自動初期化
             self._auto_initialize_if_needed()
