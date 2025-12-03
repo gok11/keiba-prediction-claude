@@ -190,13 +190,15 @@ class NetkeibaScraper:
         # レース情報をパース
         race_info = self.parser.parse_race_info(html, race_id)
         if not race_info:
-            self.logger.warning(f"Failed to parse race info: {race_id}")
+            # 存在しないレースまたはパースエラー（正常なケース）
+            self.logger.debug(f"Race {race_id} not found or parse failed (no race data)")
             return False
 
         # レース結果をパース
         race_results = self.parser.parse_race_results(html, race_id)
         if not race_results:
-            self.logger.warning(f"No race results found: {race_id}")
+            # 結果が未確定または存在しない（正常なケース）
+            self.logger.debug(f"No race results found for {race_id} (未確定or存在しない)")
             return False
 
         # 払戻金情報をパース
