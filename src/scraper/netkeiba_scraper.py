@@ -68,6 +68,7 @@ class NetkeibaScraper:
             'successful_requests': 0,
             'failed_requests': 0,
             'races_saved': 0,
+            'races_skipped': 0,
             'results_saved': 0
         }
 
@@ -169,6 +170,12 @@ class NetkeibaScraper:
         Returns:
             成功したかどうか
         """
+        # 既に存在するレースはスキップ
+        if self.db_manager.race_exists(race_id):
+            self.logger.debug(f"Race {race_id} already exists, skipping")
+            self.stats['races_skipped'] += 1
+            return True  # スキップは成功とみなす
+
         url = urljoin(self.base_url, f"race/{race_id}/")
         html = self.fetch_url(url)
 
@@ -340,6 +347,7 @@ class NetkeibaScraper:
         self.logger.info(f"Successful: {self.stats['successful_requests']}")
         self.logger.info(f"Failed: {self.stats['failed_requests']}")
         self.logger.info(f"Races saved: {self.stats['races_saved']}")
+        self.logger.info(f"Races skipped: {self.stats['races_skipped']}")
         self.logger.info(f"Results saved: {self.stats['results_saved']}")
 
         if self.stats['total_requests'] > 0:

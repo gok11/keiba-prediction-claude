@@ -42,8 +42,7 @@ class ScrapingWorker(QThread):
             app_config = Config()
             app_config.set('scraping.sleep_min', self.config_dict['sleep_min'])
             app_config.set('scraping.sleep_max', self.config_dict['sleep_max'])
-            app_config.set('scraping.parallel_count', self.config_dict['parallel_count'])
-            app_config.set('scraping.fetch_pedigree', self.config_dict.get('fetch_pedigree', False))
+            app_config.set('scraping.fetch_pedigree', self.config_dict.get('fetch_pedigree', True))
 
             # スクレイパーの初期化
             self.scraper = NetkeibaScraper(self.db_manager, app_config)
@@ -77,6 +76,7 @@ class ScrapingWorker(QThread):
             self.log_message.emit(f"成功: {stats['successful_requests']}")
             self.log_message.emit(f"失敗: {stats['failed_requests']}")
             self.log_message.emit(f"保存されたレース数: {stats['races_saved']}")
+            self.log_message.emit(f"スキップされたレース数: {stats['races_skipped']}")
             self.log_message.emit(f"保存された結果数: {stats['results_saved']}")
 
             self.scraping_finished.emit(stats)

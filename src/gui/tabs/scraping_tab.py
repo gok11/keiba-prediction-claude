@@ -73,22 +73,10 @@ class ScrapingTab(QWidget):
         sleep_layout.addStretch()
         settings_layout.addLayout(sleep_layout)
 
-        # 並行処理設定
-        parallel_layout = QHBoxLayout()
-        parallel_layout.addWidget(QLabel("並行処理数:"))
-
-        self.parallel_count = QSpinBox()
-        self.parallel_count.setRange(1, 5)
-        self.parallel_count.setValue(1)
-        parallel_layout.addWidget(self.parallel_count)
-        parallel_layout.addWidget(QLabel("(推奨: 1-2, IPブロックに注意)"))
-        parallel_layout.addStretch()
-        settings_layout.addLayout(parallel_layout)
-
         # 血統情報取得オプション
         pedigree_layout = QHBoxLayout()
         self.fetch_pedigree = QCheckBox("血統情報を取得する（追加リクエストが必要）")
-        self.fetch_pedigree.setChecked(False)
+        self.fetch_pedigree.setChecked(True)  # デフォルトで有効
         pedigree_layout.addWidget(self.fetch_pedigree)
         pedigree_layout.addWidget(QLabel("※リクエスト数が大幅に増えます"))
         pedigree_layout.addStretch()
@@ -161,16 +149,12 @@ class ScrapingTab(QWidget):
             'end_date': self.end_date.date().toString("yyyy-MM-dd"),
             'sleep_min': self.sleep_min.value(),
             'sleep_max': self.sleep_max.value(),
-            'parallel_count': self.parallel_count.value(),
             'fetch_pedigree': self.fetch_pedigree.isChecked()
         }
 
         self.add_log(f"期間: {config['start_date']} ～ {config['end_date']}")
         self.add_log(f"スリープ時間: {config['sleep_min']}～{config['sleep_max']}秒")
-        self.add_log(f"並行処理数: {config['parallel_count']}")
         self.add_log(f"血統情報取得: {'有効' if config['fetch_pedigree'] else '無効'}")
-        if config['fetch_pedigree']:
-            self.add_log("⚠️  血統情報取得が有効です。リクエスト数が増加します。")
         self.add_log("=" * 50)
 
         # スクレイピングワーカーの作成と起動
@@ -217,6 +201,7 @@ class ScrapingTab(QWidget):
             f"スクレイピングが完了しました！\n\n"
             f"総リクエスト数: {stats['total_requests']}\n"
             f"保存されたレース数: {stats['races_saved']}\n"
+            f"スキップされたレース数: {stats['races_skipped']}\n"
             f"保存された結果数: {stats['results_saved']}"
         )
 

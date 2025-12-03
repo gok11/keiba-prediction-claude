@@ -301,6 +301,20 @@ class DatabaseManager:
         """
         return self.query_to_dataframe(query, (horse_id, limit))
 
+    def race_exists(self, race_id: str) -> bool:
+        """
+        レースが既にデータベースに存在するかチェック
+
+        Args:
+            race_id: レースID
+
+        Returns:
+            存在する場合True
+        """
+        query = "SELECT COUNT(*) FROM races WHERE race_id = ?"
+        result = self.execute_query(query, (race_id,))
+        return result[0][0] > 0 if result else False
+
     def get_statistics(self) -> Dict[str, int]:
         """
         データベース統計情報を取得
