@@ -433,12 +433,25 @@ class NetkeibaParser:
         race_ids = []
 
         try:
+            # HTMLの一部をデバッグ出力
+            print(f"DEBUG: HTML length: {len(html)}")
+            print(f"DEBUG: HTML preview (first 500 chars):\n{html[:500]}")
+
             # レースへのリンクを全て取得
             # 通常、レースIDはURLに含まれている: /race/202305010212/ など
-            links = soup.find_all('a', href=re.compile(r'/race/\d{12}/?'))
+            all_links = soup.find_all('a', href=True)
+            print(f"DEBUG: Total links found: {len(all_links)}")
 
-            for link in links:
+            # レースIDパターンにマッチするリンクのみ
+            race_links = [link for link in all_links if re.search(r'/race/\d{12}/?', link.get('href', ''))]
+            print(f"DEBUG: Race links found: {len(race_links)}")
+
+            for link in race_links[:5]:  # 最初の5件だけデバッグ出力
                 href = link.get('href')
+                print(f"DEBUG: Link href: {href}, text: {link.text.strip()[:50]}")
+
+            for link in all_links:
+                href = link.get('href', '')
                 # レースIDを抽出（12桁の数字）
                 match = re.search(r'/race/(\d{12})/?', href)
                 if match:
@@ -446,7 +459,11 @@ class NetkeibaParser:
                     if race_id not in race_ids:  # 重複排除
                         race_ids.append(race_id)
 
+            print(f"DEBUG: Extracted race_ids: {race_ids[:10]}")  # 最初の10件
+
         except Exception as e:
             print(f"レースリストパースエラー: {e}")
+            import traceback
+            traceback.print_exc()
 
         return race_ids
