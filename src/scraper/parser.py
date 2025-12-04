@@ -151,28 +151,15 @@ class NetkeibaParser:
         results = []
 
         try:
-            # 結果テーブルを取得
-            result_table = soup.find('table', class_='RaceTable01')
-
-            # デバッグ: テーブルが見つからない場合、他のテーブルクラスを探す
-            if not result_table:
-                print(f"DEBUG parse_race_results: RaceTable01 not found for {race_id}")
-                # 全てのテーブルを確認
-                all_tables = soup.find_all('table', class_=True)
-                table_classes = [t.get('class') for t in all_tables[:10]]
-                print(f"DEBUG: Found table classes: {table_classes}")
-
-                # race_result クラスを試す
-                result_table = soup.find('table', class_='race_result')
-                if result_table:
-                    print(f"DEBUG: Found table with class 'race_result'")
+            # 結果テーブルを取得（新しいHTML構造: race_table_01）
+            result_table = soup.find('table', class_='race_table_01')
 
             if not result_table:
-                print(f"DEBUG: No result table found for {race_id}")
+                print(f"DEBUG: race_table_01 not found for {race_id}")
                 return results
 
             rows = result_table.find_all('tr')
-            print(f"DEBUG: Found {len(rows)} rows in result table")
+            print(f"DEBUG: Found {len(rows)} rows in result table for {race_id}")
 
             for row in rows[1:]:  # ヘッダー行をスキップ
                 cols = row.find_all('td')
