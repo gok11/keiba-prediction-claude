@@ -221,11 +221,18 @@ class NetkeibaParser:
                 # 着差
                 margin = cols[8].text.strip()
 
+                # タイム指数（プレミアム情報）
+                time_index = None
+                if len(cols) > 9:
+                    time_index_text = cols[9].text.strip()
+                    if time_index_text and time_index_text.isdigit():
+                        time_index = int(time_index_text)
+
                 # 通過順位
-                passing_order = cols[9].text.strip() if len(cols) > 9 else ""
+                passing_order = cols[10].text.strip() if len(cols) > 10 else ""
 
                 # 上がり3ハロン（秒）
-                last_3f_text = cols[10].text.strip() if len(cols) > 10 else ""
+                last_3f_text = cols[11].text.strip() if len(cols) > 11 else ""
                 last_3f = None
                 if last_3f_text:
                     try:
@@ -234,7 +241,7 @@ class NetkeibaParser:
                         pass
 
                 # 人気
-                popularity_text = cols[11].text.strip() if len(cols) > 11 else ""
+                popularity_text = cols[13].text.strip() if len(cols) > 13 else ""
                 try:
                     popularity = int(popularity_text)
                 except:
@@ -272,6 +279,11 @@ class NetkeibaParser:
                         horse_weight = int(weight_match.group(1))
                         horse_weight_diff = int(weight_match.group(2))
 
+                # 備考（プレミアム情報）
+                remarks = ""
+                if len(cols) > 17:
+                    remarks = cols[17].text.strip()
+
                 # 調教師
                 trainer_name = ""
                 trainer_id = ""
@@ -306,7 +318,10 @@ class NetkeibaParser:
                     'passing_order': passing_order,
                     'last_3f': last_3f,
                     'sex': sex,
-                    'age': age
+                    'age': age,
+                    # プレミアム情報
+                    'time_index': time_index,
+                    'remarks': remarks
                 }
 
                 results.append(result)
@@ -519,3 +534,242 @@ class NetkeibaParser:
             traceback.print_exc()
 
         return race_ids
+
+    @staticmethod
+    def parse_premium_race_info(html: str, race_id: str) -> Optional[Dict[str, Any]]:
+        """
+        レース詳細ページからプレミアム情報をパース
+
+        Args:
+            html: レースページのHTML
+            race_id: レースID
+
+        Returns:
+            プレミアム情報の辞書（馬場指数、馬場コメント、レース分析、注目馬短評）
+        """
+        soup = BeautifulSoup(html, 'lxml')
+        premium_info = {
+            'race_id': race_id,
+            'track_index': None,
+            'track_comment': None,
+            'race_analysis_comment': None,
+            'horse_short_reviews': []
+        }
+
+        try:
+            # 馬場情報テーブルから馬場指数と馬場コメントを取得
+            track_info_tables = soup.find_all('table', class_='result_table_02', summary='馬場情報')
+            for table in track_info_tables:
+                rows = table.find_all('tr')
+                for row in rows:
+                    th = row.find('th')
+                    td = row.find('td')
+                    if th and td:
+                        th_text = th.text.strip()
+                        if '馬場指数' in th_text:
+                            # "−3" のような形式
+                            index_text = td.text.strip().split()[0]  # "?(...)"部分を除去
+                            try:
+                                premium_info['track_index'] = int(index_text.replace('−', '-'))
+                            except:
+                                pass
+                        elif '馬場コメント' in th_text:
+                            premium_info['track_comment'] = td.text.strip()
+
+            # レース分析テーブルからコメントを取得
+            analysis_tables = soup.find_all('table', class_='result_table_02', summary='レース分析')
+            for table in analysis_tables:
+                rows = table.find_all('tr')
+                for row in rows:
+                    th = row.find('th')
+                    td = row.find('td')
+                    if th and td and '分析コメント' in th.text:
+                        premium_info['race_analysis_comment'] = td.text.strip()
+                        break
+
+            # 注目馬短評テーブルから各馬の短評を取得
+            review_tables = soup.find_all('table', class_='result_table_02', summary='注目馬 レース後の短評')
+            for table in review_tables:
+                rows = table.find_all('tr')
+                current_horse = None
+                for row in rows:
+                    th = row.find('th')
+                    td = row.find('td')
+
+                    if th:
+                        # 馬名と着順を取得（例: "1着:オイデヤスダイジン"）
+                        horse_info = th.text.strip()
+                        if ':' in horse_info:
+                            position_str, horse_name = horse_info.split(':', 1)
+                            position_match = re.search(r'(\d+)着', position_str)
+                            finishing_position = int(position_match.group(1)) if position_match else None
+                            current_horse = {
+                                'horse_name': horse_name.strip(),
+                                'finishing_position': finishing_position,
+                                'review': None
+                            }
+                    elif td and current_horse:
+                        # 短評を取得
+                        current_horse['review'] = td.text.strip()
+                        premium_info['horse_short_reviews'].append(current_horse)
+                        current_horse = None
+
+        except Exception as e:
+            print(f"プレミアム情報パースエラー: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return premium_info
+
+    @staticmethod
+    def parse_training_times(html: str, horse_id: str, race_id: str) -> List[Dict[str, Any]]:
+        """
+        調教タイムページから調教情報をパース
+
+        Args:
+            html: 調教タイムページのHTML
+            horse_id: 馬ID
+            race_id: 対象レースID
+
+        Returns:
+            調教タイム情報のリスト
+        """
+        soup = BeautifulSoup(html, 'lxml')
+        training_times = []
+
+        try:
+            # 調教タイムテーブルを取得
+            training_tables = soup.find_all('table', class_='race_table_01')
+
+            for table in training_tables:
+                # レースIDが一致するテーブルのみ処理
+                caption = table.find('caption')
+                if not caption or race_id not in caption.text:
+                    continue
+
+                rows = table.find_all('tr')
+                for row in rows[1:]:  # ヘッダー行をスキップ
+                    cols = row.find_all('td')
+                    if len(cols) < 8:
+                        continue
+
+                    # 日付
+                    date_text = cols[0].text.strip()
+                    date_match = re.search(r'(\d{4})/(\d{1,2})/(\d{1,2})', date_text)
+                    training_date = f"{date_match.group(1)}-{date_match.group(2).zfill(2)}-{date_match.group(3).zfill(2)}" if date_match else None
+
+                    # コース
+                    course = cols[1].text.strip()
+
+                    # 馬場状態
+                    track_condition = cols[2].text.strip()
+
+                    # 乗り役
+                    rider = cols[3].text.strip()
+
+                    # 調教タイム（TrainingTimeDataList内のli要素）
+                    time_data = cols[4]
+                    time_list = time_data.find_all('li')
+                    time_6f = None
+                    time_5f = None
+                    time_4f = None
+                    time_3f = None
+                    time_1f = None
+
+                    if len(time_list) >= 5:
+                        try:
+                            time_6f = float(time_list[0].text.strip()) if time_list[0].text.strip() != '-' else None
+                        except:
+                            pass
+                        try:
+                            time_5f = float(time_list[1].text.strip()) if time_list[1].text.strip() != '-' else None
+                        except:
+                            pass
+                        try:
+                            time_4f = float(time_list[2].text.strip()) if time_list[2].text.strip() != '-' else None
+                        except:
+                            pass
+                        try:
+                            time_3f = float(time_list[3].text.strip()) if time_list[3].text.strip() != '-' else None
+                        except:
+                            pass
+                        try:
+                            time_1f = float(time_list[4].text.strip()) if time_list[4].text.strip() != '-' else None
+                        except:
+                            pass
+
+                    # 併せ馬情報（TrainingHeisou）
+                    parallel_info_elem = time_data.find('p', class_='TrainingHeisou')
+                    parallel_info = parallel_info_elem.text.strip() if parallel_info_elem else None
+
+                    # 位置
+                    position_text = cols[5].text.strip()
+                    position = int(position_text) if position_text.isdigit() else None
+
+                    # 脚色
+                    intensity = cols[6].text.strip()
+
+                    # 評価テキスト
+                    evaluation_text = cols[7].text.strip()
+
+                    # 評価グレード
+                    evaluation_grade = cols[8].text.strip() if len(cols) > 8 else None
+
+                    training_times.append({
+                        'horse_id': horse_id,
+                        'race_id': race_id,
+                        'training_date': training_date,
+                        'course': course,
+                        'track_condition': track_condition,
+                        'rider': rider,
+                        'time_6f': time_6f,
+                        'time_5f': time_5f,
+                        'time_4f': time_4f,
+                        'time_3f': time_3f,
+                        'time_1f': time_1f,
+                        'position': position,
+                        'intensity': intensity,
+                        'evaluation_text': evaluation_text,
+                        'evaluation_grade': evaluation_grade,
+                        'parallel_info': parallel_info
+                    })
+
+        except Exception as e:
+            print(f"調教タイムパースエラー: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return training_times
+
+    @staticmethod
+    def parse_stable_comment(html: str, horse_id: str, race_id: str) -> Optional[str]:
+        """
+        厩舎コメントページからコメントをパース
+
+        Args:
+            html: 厩舎コメントページのHTML
+            horse_id: 馬ID
+            race_id: 対象レースID
+
+        Returns:
+            厩舎コメント（文字列）
+        """
+        soup = BeautifulSoup(html, 'lxml')
+
+        try:
+            # コメントテーブルを探す
+            tables = soup.find_all('table', class_='border')
+            for table in tables:
+                rows = table.find_all('tr')
+                for row in rows:
+                    td = row.find('td', class_='bml')
+                    if td:
+                        comment = td.text.strip()
+                        return comment
+
+        except Exception as e:
+            print(f"厩舎コメントパースエラー: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return None
