@@ -346,6 +346,7 @@ class NetkeibaParser:
                     continue
 
                 payout_type = th.text.strip()
+                print(f"DEBUG: Found payout_type: '{payout_type}' for race {race_id}")
 
                 # 払戻データ
                 tds = row.find_all('td')
@@ -362,6 +363,7 @@ class NetkeibaParser:
                 try:
                     payout_amount = int(payout_text)
                 except:
+                    print(f"DEBUG: Failed to parse payout amount: '{payout_text}'")
                     continue
 
                 # 人気
@@ -372,6 +374,8 @@ class NetkeibaParser:
                         popularity = int(popularity_text)
                     except:
                         pass
+
+                print(f"DEBUG: Parsed payout - type: '{payout_type}', combination: '{combination}', amount: {payout_amount}")
 
                 payouts.append({
                     'race_id': race_id,
