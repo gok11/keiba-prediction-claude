@@ -88,14 +88,63 @@ keiba-prediction-claude/
 
 **注意**: IPブロックを避けるため、適切なスリープ時間を設定してください
 
-### 3. モデルトレーニング
+### 3. データ閲覧（コマンドラインツール）
+
+収集したデータをコマンドラインで簡単に閲覧できます：
+
+#### Windows:
+```bash
+# レース一覧を表示
+view_data.bat list
+
+# レース詳細を表示
+view_data.bat race <レースID>
+
+# 馬の過去成績を表示
+view_data.bat horse <馬ID>
+
+# データベース統計を表示
+view_data.bat stats
+```
+
+#### Linux/Mac:
+```bash
+# レース一覧を表示
+./view_data.sh list
+
+# レース詳細を表示（例: レースID 202408030211）
+./view_data.sh race 202408030211
+
+# 馬の過去成績を表示（例: 馬ID 2012104324）
+./view_data.sh horse 2012104324
+
+# データベース統計を表示
+./view_data.sh stats
+```
+
+#### Pythonスクリプト直接実行:
+```bash
+# レース一覧（期間指定）
+python view_data.py list --start 2020-01-01 --end 2020-12-31
+
+# レース詳細（ラップタイム、払戻金、プレミアム情報含む）
+python view_data.py race 202408030211
+
+# 馬の過去成績（最新10件）
+python view_data.py horse 2012104324 --limit 10
+
+# データベース統計
+python view_data.py stats
+```
+
+### 4. モデルトレーニング
 
 「トレーニング」タブで:
 - 使用するモデルを選択（LightGBM推奨）
 - ハイパーパラメータを調整
 - 「トレーニング開始」をクリック
 
-### 4. バックテスト
+### 5. バックテスト
 
 「バックテスト」タブで:
 - 訓練済みモデルを選択
@@ -103,7 +152,7 @@ keiba-prediction-claude/
 - 購入戦略を設定
 - 「バックテスト実行」をクリック
 
-### 5. 本番予想
+### 6. 本番予想
 
 「本番予想」タブで:
 - 対象日を選択
