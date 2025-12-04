@@ -332,88 +332,90 @@ class NetkeibaParser:
         payouts = []
 
         try:
-            # 払戻金テーブルを取得（新しいHTML構造: pay_table_01）
-            payout_table = soup.find('table', class_='pay_table_01')
-            if not payout_table:
+            # 払戻金テーブルを全て取得（左右2つのテーブルに分かれている）
+            payout_tables = soup.find_all('table', class_='pay_table_01')
+            if not payout_tables:
                 return payouts
 
-            rows = payout_table.find_all('tr')
+            # 全てのテーブルを処理
+            for payout_table in payout_tables:
+                rows = payout_table.find_all('tr')
 
-            for row in rows:
-                # 払戻タイプ（単勝、複勝など）
-                th = row.find('th')
-                if not th:
-                    continue
-
-                payout_type = th.text.strip()
-                print(f"DEBUG: Found payout_type: '{payout_type}' for race {race_id}")
-
-                # 払戻データ
-                tds = row.find_all('td')
-                if len(tds) < 2:
-                    continue
-
-                # 組み合わせ（馬番）- 複数ある場合は<br>で区切られている
-                combination_td = tds[0]
-                # <br>タグで分割して複数の組み合わせを取得
-                combinations = []
-                if combination_td.find('br'):
-                    # <br>で区切られている場合
-                    for text in combination_td.stripped_strings:
-                        if text.strip():
-                            combinations.append(text.strip())
-                else:
-                    # 単一の組み合わせ
-                    combinations.append(combination_td.text.strip())
-
-                # 払戻金額 - 複数ある場合は<br>で区切られている
-                payout_td = tds[1]
-                payout_amounts = []
-                if payout_td.find('br'):
-                    # <br>で区切られている場合
-                    for text in payout_td.stripped_strings:
-                        text = text.strip().replace(',', '').replace('円', '')
-                        if text:
-                            try:
-                                payout_amounts.append(int(text))
-                            except:
-                                print(f"DEBUG: Failed to parse payout amount: '{text}'")
-                else:
-                    # 単一の払戻金
-                    payout_text = payout_td.text.strip().replace(',', '').replace('円', '')
-                    try:
-                        payout_amounts.append(int(payout_text))
-                    except:
-                        print(f"DEBUG: Failed to parse payout amount: '{payout_text}'")
+                for row in rows:
+                    # 払戻タイプ（単勝、複勝など）
+                    th = row.find('th')
+                    if not th:
                         continue
 
-                # 人気
-                popularity = None
-                if len(tds) > 2:
-                    popularity_text = tds[2].text.strip().replace('番人気', '')
-                    try:
-                        popularity = int(popularity_text)
-                    except:
-                        pass
+                    payout_type = th.text.strip()
+                    print(f"DEBUG: Found payout_type: '{payout_type}' for race {race_id}")
 
-                # 組み合わせと払戻金額が同じ数だけあることを確認
-                if len(combinations) != len(payout_amounts):
-                    print(f"WARNING: Combination count ({len(combinations)}) != payout count ({len(payout_amounts)}) for {payout_type}")
-                    print(f"  Combinations: {combinations}")
-                    print(f"  Payouts: {payout_amounts}")
-                    # 数が合わない場合はスキップ
-                    continue
+                    # 払戻データ
+                    tds = row.find_all('td')
+                    if len(tds) < 2:
+                        continue
 
-                # 各組み合わせと払戻金のペアを個別のエントリとして追加
-                for combination, payout_amount in zip(combinations, payout_amounts):
-                    print(f"DEBUG: Parsed payout - type: '{payout_type}', combination: '{combination}', amount: {payout_amount}")
-                    payouts.append({
-                        'race_id': race_id,
-                        'payout_type': payout_type,
-                        'combination': combination,
-                        'payout': payout_amount,
-                        'popularity': popularity
-                    })
+                    # 組み合わせ（馬番）- 複数ある場合は<br>で区切られている
+                    combination_td = tds[0]
+                    # <br>タグで分割して複数の組み合わせを取得
+                    combinations = []
+                    if combination_td.find('br'):
+                        # <br>で区切られている場合
+                        for text in combination_td.stripped_strings:
+                            if text.strip():
+                                combinations.append(text.strip())
+                    else:
+                        # 単一の組み合わせ
+                        combinations.append(combination_td.text.strip())
+
+                    # 払戻金額 - 複数ある場合は<br>で区切られている
+                    payout_td = tds[1]
+                    payout_amounts = []
+                    if payout_td.find('br'):
+                        # <br>で区切られている場合
+                        for text in payout_td.stripped_strings:
+                            text = text.strip().replace(',', '').replace('円', '')
+                            if text:
+                                try:
+                                    payout_amounts.append(int(text))
+                                except:
+                                    print(f"DEBUG: Failed to parse payout amount: '{text}'")
+                    else:
+                        # 単一の払戻金
+                        payout_text = payout_td.text.strip().replace(',', '').replace('円', '')
+                        try:
+                            payout_amounts.append(int(payout_text))
+                        except:
+                            print(f"DEBUG: Failed to parse payout amount: '{payout_text}'")
+                            continue
+
+                    # 人気
+                    popularity = None
+                    if len(tds) > 2:
+                        popularity_text = tds[2].text.strip().replace('番人気', '')
+                        try:
+                            popularity = int(popularity_text)
+                        except:
+                            pass
+
+                    # 組み合わせと払戻金額が同じ数だけあることを確認
+                    if len(combinations) != len(payout_amounts):
+                        print(f"WARNING: Combination count ({len(combinations)}) != payout count ({len(payout_amounts)}) for {payout_type}")
+                        print(f"  Combinations: {combinations}")
+                        print(f"  Payouts: {payout_amounts}")
+                        # 数が合わない場合はスキップ
+                        continue
+
+                    # 各組み合わせと払戻金のペアを個別のエントリとして追加
+                    for combination, payout_amount in zip(combinations, payout_amounts):
+                        print(f"DEBUG: Parsed payout - type: '{payout_type}', combination: '{combination}', amount: {payout_amount}")
+                        payouts.append({
+                            'race_id': race_id,
+                            'payout_type': payout_type,
+                            'combination': combination,
+                            'payout': payout_amount,
+                            'popularity': popularity
+                        })
 
         except Exception as e:
             print(f"払戻金パースエラー: {e}")
