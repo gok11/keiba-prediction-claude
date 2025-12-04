@@ -167,13 +167,26 @@ class NetkeibaScraper:
             response.encoding = 'euc-jp'
 
             # ログイン成功の確認（プレミアム会員ページにアクセスできるか）
-            # memberRank: 'Premium' がHTMLに含まれているかで判定
-            if 'Premium' in response.text or 'memberRank' in response.text:
+            # より厳密な確認：実際にプレミアム情報が含まれるページにアクセス
+            # テストレースページにアクセスして、プレミアム情報が取得できるか確認
+            test_race_url = "https://db.netkeiba.com/race/202408030211/"  # 既知のレース
+            test_response = self.session.get(test_race_url, timeout=self.timeout)
+            test_response.encoding = 'euc-jp'
+
+            # プレミアム会員限定のメッセージがないか確認
+            if 'プレミアムサービス' in test_response.text or 'プレミアム会員限定' in test_response.text:
+                self.is_logged_in = False
+                self.logger.warning("ログインに失敗しました（プレミアム情報にアクセスできません）")
+                return False
+
+            # 馬場指数やタイム指数などのプレミアム情報が含まれているか確認
+            if '馬場指数' in test_response.text or 'タイム指数' in test_response.text:
                 self.is_logged_in = True
-                self.logger.info("ログイン成功")
+                self.logger.info("ログイン成功（プレミアム情報へのアクセスを確認）")
                 return True
             else:
-                self.logger.warning("ログインに失敗した可能性があります")
+                self.is_logged_in = False
+                self.logger.warning("ログインに失敗した可能性があります（プレミアム情報が見つかりません）")
                 return False
 
         except Exception as e:

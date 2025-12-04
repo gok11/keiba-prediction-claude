@@ -148,10 +148,10 @@ class HorseHistoryDialog(QDialog):
 
         # 厩舎コメントを取得
         comment_query = """
-        SELECT sc.comment_date, sc.training_comment
+        SELECT sc.created_at, sc.comment
         FROM stable_comments sc
         WHERE sc.horse_id = ?
-        ORDER BY sc.comment_date DESC
+        ORDER BY sc.created_at DESC
         LIMIT 5
         """
         comments = self.db_manager.execute_query(comment_query, (self.horse_id,))
