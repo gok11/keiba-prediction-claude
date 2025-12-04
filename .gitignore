@@ -60,6 +60,7 @@ logs/*
 # Config (if contains sensitive info)
 config/local_settings.json
 config/credentials.json
+.env
 
 # Test
 .pytest_cache/
