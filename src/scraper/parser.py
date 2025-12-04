@@ -363,6 +363,10 @@ class NetkeibaParser:
                         continue
 
                     payout_type = th.text.strip()
+
+                    # データベースのCHECK制約に合わせて正規化
+                    payout_type = payout_type.replace('三連複', '3連複').replace('三連単', '3連単')
+
                     print(f"DEBUG: Found payout_type: '{payout_type}' for race {race_id}")
 
                     # 払戻データ
