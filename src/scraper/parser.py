@@ -417,3 +417,36 @@ class NetkeibaParser:
             print(f"血統情報パースエラー: {e}")
 
         return pedigree
+
+    @staticmethod
+    def parse_race_list(html: str) -> List[str]:
+        """
+        日付別レースリストページからレースIDを抽出
+
+        Args:
+            html: レースリストページのHTML
+
+        Returns:
+            レースIDのリスト
+        """
+        soup = BeautifulSoup(html, 'lxml')
+        race_ids = []
+
+        try:
+            # レースへのリンクを全て取得
+            # 通常、レースIDはURLに含まれている: /race/202305010212/ など
+            links = soup.find_all('a', href=re.compile(r'/race/\d{12}/?'))
+
+            for link in links:
+                href = link.get('href')
+                # レースIDを抽出（12桁の数字）
+                match = re.search(r'/race/(\d{12})/?', href)
+                if match:
+                    race_id = match.group(1)
+                    if race_id not in race_ids:  # 重複排除
+                        race_ids.append(race_id)
+
+        except Exception as e:
+            print(f"レースリストパースエラー: {e}")
+
+        return race_ids

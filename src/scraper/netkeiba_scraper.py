@@ -293,67 +293,72 @@ class NetkeibaScraper:
     def _scrape_smart(self, start_date: datetime, end_date: datetime,
                      venues: List[str], progress_callback=None):
         """
-        最適化されたスクレイピング（1Rチェックで無駄なリクエストを削減）
+        日付ベースでレースリストを取得してスクレイピング
 
         Args:
             start_date: 開始日
             end_date: 終了日
-            venues: 競馬場リスト
+            venues: 競馬場リスト（使用しない：日付からすべての競馬場を取得）
             progress_callback: 進捗コールバック
         """
+        # 日付範囲の総日数を計算
+        total_days = (end_date - start_date).days + 1
+        current_date = start_date
         processed = 0
 
-        # 年ごとに処理
-        current_year = start_date.year
-        while current_year <= end_date.year:
-            current_date = datetime(current_year, 1, 1)
+        self.logger.info(f"Scanning {total_days} days for races")
 
-            # 各競馬場について
-            for venue in venues:
-                venue_code = self.VENUE_CODES.get(venue)
-                if not venue_code:
-                    continue
+        # 日付ごとにループ
+        while current_date <= end_date:
+            processed += 1
+            date_str = current_date.strftime('%Y%m%d')
 
-                # 各開催回（年間最大6回程度）
-                for times in range(1, 7):
-                    # 各開催日（1回の開催で最大8日程度）
-                    for day_count in range(1, 9):
-                        # まず1Rをチェック
-                        race_1_id = self.generate_race_id(current_date, venue_code, 1, day_count, times)
+            if progress_callback:
+                msg = f"Checking {current_date.strftime('%Y-%m-%d')} (Saved: {self.stats['races_saved']}, Skipped: {self.stats['races_skipped']})"
+                progress_callback(processed, total_days, msg)
 
-                        if progress_callback:
-                            msg = f"Checking {venue} {current_year} {times}回{day_count}日目 (Saved: {self.stats['races_saved']}, Skipped: {self.stats['races_skipped']})"
-                            processed += 1
-                            # 概算の総数を動的に計算（正確な進捗は難しいので簡易版）
-                            progress_callback(processed, processed + 100, msg)
+            # その日のレースリストを取得
+            race_ids = self._fetch_race_list_for_date(date_str)
 
-                        # 1Rが存在しない = この開催日は存在しない
-                        if not self._race_exists_or_fetch(race_1_id):
-                            self.logger.debug(f"Race 1 not found for {venue} {current_year} {times}回{day_count}日目, skipping day")
-                            break  # この開催日の残りレースをスキップ
+            if race_ids:
+                self.logger.info(f"Found {len(race_ids)} races on {current_date.strftime('%Y-%m-%d')}")
 
-                        # 1Rから実際の開催日を取得
-                        race_date = self._get_race_date(race_1_id)
-                        date_str = race_date if race_date else '日付不明'
+                # 各レースをスクレイピング
+                for idx, race_id in enumerate(race_ids, 1):
+                    if progress_callback:
+                        msg = f"Processing {race_id} [{current_date.strftime('%Y-%m-%d')}] ({idx}/{len(race_ids)}) (Saved: {self.stats['races_saved']}, Skipped: {self.stats['races_skipped']})"
+                        progress_callback(processed, total_days, msg)
 
-                        # 1Rが存在したら、2R以降もチェック
-                        for race_num in range(2, 13):
-                            race_id = self.generate_race_id(current_date, venue_code, race_num, day_count, times)
+                    self._race_exists_or_fetch(race_id)
 
-                            if progress_callback:
-                                msg = f"Processing {race_id} [{date_str}] (Saved: {self.stats['races_saved']}, Skipped: {self.stats['races_skipped']})"
-                                processed += 1
-                                progress_callback(processed, processed + 100, msg)
+                # 統計を定期的に出力
+                if processed % 30 == 0:
+                    self._log_stats()
+            else:
+                self.logger.debug(f"No races found on {current_date.strftime('%Y-%m-%d')}")
 
-                            # レースが存在しなくなったら、この日は終了
-                            if not self._race_exists_or_fetch(race_id):
-                                break
+            # 次の日へ
+            current_date += timedelta(days=1)
 
-                        # 統計を定期的に出力
-                        if processed % 100 == 0:
-                            self._log_stats()
+    def _fetch_race_list_for_date(self, date_str: str) -> List[str]:
+        """
+        特定日付のレースリストを取得
 
-            current_year += 1
+        Args:
+            date_str: 日付文字列（YYYYMMDD形式）
+
+        Returns:
+            レースIDのリスト
+        """
+        url = urljoin(self.base_url, f"race/list/{date_str}/")
+        html = self.fetch_url(url)
+
+        if not html:
+            return []
+
+        # レースリストをパース
+        race_ids = self.parser.parse_race_list(html)
+        return race_ids
 
     def _race_exists_or_fetch(self, race_id: str) -> bool:
         """
