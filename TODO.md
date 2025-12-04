@@ -120,6 +120,14 @@
   - 問題: ヘッダー行「馬名」を処理しようとして "Horse not found in results: 馬名" 警告が発生
   - 解決: ':' を含まない行（ヘッダー行など）をスキップする処理を追加（parser.py:607-608）
 
+- [x] データ閲覧GUI: レース詳細ダイアログのクラッシュ（2025-12-04）
+  - 問題: タイムと着差がfloat型のままQTableWidgetItemに渡されてTypeError
+  - 解決: race_detail_dialog.py:150-151でstr()変換を追加
+
+- [x] データ閲覧GUI: 馬の過去成績ダイアログのクラッシュ（2025-12-04）
+  - 問題: タイムがfloat型のままQTableWidgetItemに渡されてTypeError
+  - 解決: horse_history_dialog.py:99でstr()変換を追加
+
 ---
 
 ## 📝 注意事項

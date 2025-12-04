@@ -96,7 +96,7 @@ class HorseHistoryDialog(QDialog):
                 distance = f"{row_data[3]}m" if row_data[3] else ""
                 track = row_data[4] if row_data[4] else ""
                 pos = str(row_data[6]) if row_data[6] else ""
-                time = row_data[7] if row_data[7] else ""
+                time = str(row_data[7]) if row_data[7] else ""
                 jockey = row_data[8] if row_data[8] else ""
                 pop = str(row_data[9]) if row_data[9] else ""
                 odds = f"{row_data[10]:.1f}" if row_data[10] else ""
