@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS races (
     grade TEXT,  -- G1, G2, G3, など
     race_number INTEGER,
     start_time TIME,
+    -- プレミアム情報
+    track_index INTEGER,  -- 馬場指数
+    track_comment TEXT,  -- 馬場コメント
+    race_analysis_comment TEXT,  -- レース分析コメント
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -70,6 +74,9 @@ CREATE TABLE IF NOT EXISTS race_results (
     passing_order TEXT,  -- 通過順位（コーナー毎）
     running_style TEXT,  -- 脚質
     disqualification TEXT,  -- 失格・除外情報
+    -- プレミアム情報
+    time_index INTEGER,  -- タイム指数
+    remarks TEXT,  -- 備考（出遅れなど）
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (race_id) REFERENCES races(race_id),
     FOREIGN KEY (horse_id) REFERENCES horses(horse_id),
@@ -182,6 +189,54 @@ CREATE TABLE IF NOT EXISTS backtest_details (
     FOREIGN KEY (race_id) REFERENCES races(race_id)
 );
 
+-- 調教タイム詳細テーブル（プレミアム機能）
+CREATE TABLE IF NOT EXISTS training_details (
+    training_detail_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    horse_id TEXT NOT NULL,
+    race_id TEXT NOT NULL,  -- 対象レース
+    training_date DATE NOT NULL,
+    course TEXT,  -- コース（美坂、南W、栗坂など）
+    track_condition TEXT,  -- 馬場状態（良、稍、重、不良）
+    rider TEXT,  -- 乗り役（騎手名、助手など）
+    time_6f REAL,  -- 6Fタイム（秒）
+    time_5f REAL,  -- 5Fタイム（秒）
+    time_4f REAL,  -- 4Fタイム（秒）
+    time_3f REAL,  -- 3Fタイム（秒）
+    time_1f REAL,  -- 1Fタイム（秒）
+    position INTEGER,  -- 併せ馬での位置
+    intensity TEXT,  -- 脚色（強め、馬也など）
+    evaluation_text TEXT,  -- 評価テキスト（態勢整う、順調など）
+    evaluation_grade TEXT,  -- 評価グレード（A, B, C など）
+    parallel_info TEXT,  -- 併せ馬情報
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (horse_id) REFERENCES horses(horse_id),
+    FOREIGN KEY (race_id) REFERENCES races(race_id)
+);
+
+-- 厩舎コメントテーブル（プレミアム機能）
+CREATE TABLE IF NOT EXISTS stable_comments (
+    comment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    horse_id TEXT NOT NULL,
+    race_id TEXT NOT NULL,  -- 対象レース
+    comment TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (horse_id) REFERENCES horses(horse_id),
+    FOREIGN KEY (race_id) REFERENCES races(race_id)
+);
+
+-- 注目馬短評テーブル（プレミアム機能）
+CREATE TABLE IF NOT EXISTS horse_short_reviews (
+    review_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    race_id TEXT NOT NULL,
+    horse_id TEXT NOT NULL,
+    horse_name TEXT NOT NULL,
+    finishing_position INTEGER,  -- 着順
+    review TEXT NOT NULL,  -- 短評
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (race_id) REFERENCES races(race_id),
+    FOREIGN KEY (horse_id) REFERENCES horses(horse_id)
+);
+
 -- インデックス作成
 CREATE INDEX IF NOT EXISTS idx_races_date ON races(date);
 CREATE INDEX IF NOT EXISTS idx_races_venue ON races(venue);
@@ -192,3 +247,9 @@ CREATE INDEX IF NOT EXISTS idx_training_horse_id ON training(horse_id);
 CREATE INDEX IF NOT EXISTS idx_training_date ON training(date);
 CREATE INDEX IF NOT EXISTS idx_predictions_race_id ON predictions(race_id);
 CREATE INDEX IF NOT EXISTS idx_backtest_results_model ON backtest_results(model_name);
+CREATE INDEX IF NOT EXISTS idx_training_details_horse_id ON training_details(horse_id);
+CREATE INDEX IF NOT EXISTS idx_training_details_race_id ON training_details(race_id);
+CREATE INDEX IF NOT EXISTS idx_stable_comments_horse_id ON stable_comments(horse_id);
+CREATE INDEX IF NOT EXISTS idx_stable_comments_race_id ON stable_comments(race_id);
+CREATE INDEX IF NOT EXISTS idx_horse_short_reviews_race_id ON horse_short_reviews(race_id);
+CREATE INDEX IF NOT EXISTS idx_horse_short_reviews_horse_id ON horse_short_reviews(horse_id);
