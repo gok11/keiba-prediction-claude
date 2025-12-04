@@ -604,7 +604,11 @@ class NetkeibaParser:
                         # 馬名と着順を取得（例: "1着:オイデヤスダイジン"）
                         horse_info = th.text.strip()
                         # ヘッダー行や無効なデータをスキップ
+                        # 「:」を含まない、または「数字+着」のパターンがない行をスキップ
                         if ':' not in horse_info:
+                            continue
+                        # 着順のパターンがあるかチェック
+                        if not re.search(r'\d+着', horse_info):
                             continue
                         position_str, horse_name = horse_info.split(':', 1)
                         position_match = re.search(r'(\d+)着', position_str)
