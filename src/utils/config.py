@@ -39,7 +39,9 @@ class Config:
                     "sleep_max": 5.0,
                     "parallel_count": 1,
                     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                    "timeout": 30
+                    "timeout": 30,
+                    "fetch_pedigree": False,
+                    "fetch_premium_training": True
                 },
                 "ml": {
                     "default_model": "LightGBM",

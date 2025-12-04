@@ -82,6 +82,15 @@ class ScrapingTab(QWidget):
         pedigree_layout.addStretch()
         settings_layout.addLayout(pedigree_layout)
 
+        # プレミアム調教情報取得オプション
+        premium_training_layout = QHBoxLayout()
+        self.fetch_premium_training = QCheckBox("プレミアム調教情報を取得する（追加リクエストが必要）")
+        self.fetch_premium_training.setChecked(True)  # デフォルトで有効
+        premium_training_layout.addWidget(self.fetch_premium_training)
+        premium_training_layout.addWidget(QLabel("※各馬ごとに2リクエスト増えます"))
+        premium_training_layout.addStretch()
+        settings_layout.addLayout(premium_training_layout)
+
         layout.addWidget(settings_group)
 
         # コントロールボタン
@@ -149,12 +158,14 @@ class ScrapingTab(QWidget):
             'end_date': self.end_date.date().toString("yyyy-MM-dd"),
             'sleep_min': self.sleep_min.value(),
             'sleep_max': self.sleep_max.value(),
-            'fetch_pedigree': self.fetch_pedigree.isChecked()
+            'fetch_pedigree': self.fetch_pedigree.isChecked(),
+            'fetch_premium_training': self.fetch_premium_training.isChecked()
         }
 
         self.add_log(f"期間: {config['start_date']} ～ {config['end_date']}")
         self.add_log(f"スリープ時間: {config['sleep_min']}～{config['sleep_max']}秒")
         self.add_log(f"血統情報取得: {'有効' if config['fetch_pedigree'] else '無効'}")
+        self.add_log(f"プレミアム調教情報取得: {'有効' if config['fetch_premium_training'] else '無効'}")
         self.add_log("=" * 50)
 
         # スクレイピングワーカーの作成と起動

@@ -53,6 +53,7 @@ class NetkeibaScraper:
         self.user_agent = self.config.get('scraping.user_agent', 'Mozilla/5.0')
         self.timeout = self.config.get('scraping.timeout', 30)
         self.fetch_pedigree = self.config.get('scraping.fetch_pedigree', False)
+        self.fetch_premium_training = self.config.get('scraping.fetch_premium_training', True)
 
         # セッション設定
         self.session = requests.Session()
@@ -520,7 +521,12 @@ class NetkeibaScraper:
             return True
 
         # フェッチを試みる（既にDBチェック済みなのでスキップ）
-        return self.scrape_race(race_id, fetch_pedigree=self.fetch_pedigree, skip_db_check=True)
+        return self.scrape_race(
+            race_id,
+            fetch_pedigree=self.fetch_pedigree,
+            fetch_premium_training=self.fetch_premium_training,
+            skip_db_check=True
+        )
 
     def _get_race_date(self, race_id: str) -> Optional[str]:
         """
