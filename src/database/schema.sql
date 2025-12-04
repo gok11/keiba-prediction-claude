@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS odds (
 CREATE TABLE IF NOT EXISTS payouts (
     payout_id INTEGER PRIMARY KEY AUTOINCREMENT,
     race_id TEXT NOT NULL,
-    payout_type TEXT NOT NULL CHECK (payout_type IN ('単勝', '複勝', '馬連', '馬単', 'ワイド', '3連複', '3連単')),
+    payout_type TEXT NOT NULL CHECK (payout_type IN ('単勝', '複勝', '枠連', '馬連', '馬単', 'ワイド', '3連複', '3連単')),
     combination TEXT NOT NULL,
     payout INTEGER,  -- 払戻金（100円あたり）
     popularity INTEGER,  -- 人気
