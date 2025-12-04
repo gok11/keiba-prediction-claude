@@ -6,9 +6,11 @@ netkeiba.comスクレイパーモジュール
 import requests
 import time
 import random
+import os
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from urllib.parse import urljoin
+from dotenv import load_dotenv
 
 from src.scraper.parser import NetkeibaParser
 from src.database.db_manager import DatabaseManager
@@ -61,6 +63,16 @@ class NetkeibaScraper:
             'Accept-Encoding': 'gzip, deflate',
             'Connection': 'keep-alive',
         })
+
+        # ログイン情報を読み込み
+        load_dotenv()
+        self.username = os.getenv('NETKEIBA_USERNAME')
+        self.password = os.getenv('NETKEIBA_PASSWORD')
+        self.is_logged_in = False
+
+        # プレミアム会員の場合は自動ログイン
+        if self.username and self.password:
+            self.login()
 
         # 統計
         self.stats = {
@@ -117,6 +129,56 @@ class NetkeibaScraper:
 
         return None
 
+    def login(self) -> bool:
+        """
+        netkeiba.comにログイン
+
+        Returns:
+            ログイン成功: True, 失敗: False
+        """
+        if not self.username or not self.password:
+            self.logger.warning("ログイン情報が設定されていません")
+            return False
+
+        try:
+            self.logger.info("netkeiba.comにログイン中...")
+
+            # ログインURL
+            login_url = "https://regist.netkeiba.com/account/?pid=login"
+
+            # ログインページにアクセス（セッション確立）
+            login_page = self.session.get(login_url, timeout=self.timeout)
+            login_page.encoding = 'euc-jp'
+
+            # ログイン情報をPOST
+            login_data = {
+                'login_id': self.username,
+                'pswd': self.password,
+                'redirect_url': '',
+            }
+
+            response = self.session.post(
+                login_url,
+                data=login_data,
+                timeout=self.timeout,
+                allow_redirects=True
+            )
+            response.encoding = 'euc-jp'
+
+            # ログイン成功の確認（プレミアム会員ページにアクセスできるか）
+            # memberRank: 'Premium' がHTMLに含まれているかで判定
+            if 'Premium' in response.text or 'memberRank' in response.text:
+                self.is_logged_in = True
+                self.logger.info("ログイン成功")
+                return True
+            else:
+                self.logger.warning("ログインに失敗した可能性があります")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"ログインエラー: {e}")
+            return False
+
     def generate_race_id(self, date: datetime, venue_code: str, race_number: int,
                         day_count: int = 1, times: int = 1) -> str:
         """
@@ -167,7 +229,8 @@ class NetkeibaScraper:
 
         return None
 
-    def scrape_race(self, race_id: str, fetch_pedigree: bool = False, skip_db_check: bool = False) -> bool:
+    def scrape_race(self, race_id: str, fetch_pedigree: bool = False, skip_db_check: bool = False,
+                    fetch_premium_training: bool = False) -> bool:
         """
         特定のレースをスクレイピング
 
@@ -175,6 +238,7 @@ class NetkeibaScraper:
             race_id: レースID
             fetch_pedigree: 血統情報も取得するか（追加リクエストが必要）
             skip_db_check: DBチェックをスキップするか（既にチェック済みの場合）
+            fetch_premium_training: プレミアム調教情報も取得するか（追加リクエストが必要）
 
         Returns:
             成功したかどうか
@@ -200,6 +264,17 @@ class NetkeibaScraper:
             self.logger.warning(f"Race {race_id} not found or parse failed (no race data) - checking HTML")
             return False
 
+        # プレミアム情報をパース（ログイン済みの場合のみ）
+        premium_info = None
+        if self.is_logged_in:
+            premium_info = self.parser.parse_premium_race_info(html, race_id)
+            if premium_info:
+                # プレミアム情報をrace_infoに統合
+                race_info['track_index'] = premium_info.get('track_index')
+                race_info['track_comment'] = premium_info.get('track_comment')
+                race_info['race_analysis_comment'] = premium_info.get('race_analysis_comment')
+                self.logger.debug(f"Parsed premium race info for {race_id}")
+
         # レース結果をパース
         race_results = self.parser.parse_race_results(html, race_id)
         if not race_results:
@@ -209,6 +284,11 @@ class NetkeibaScraper:
 
         # 払戻金情報をパース
         payouts = self.parser.parse_payouts(html, race_id)
+
+        # 注目馬短評をパース（プレミアム情報が取得できている場合）
+        horse_short_reviews = []
+        if self.is_logged_in and premium_info:
+            horse_short_reviews = premium_info.get('horse_short_reviews', [])
 
         # データベースに保存
         try:
@@ -260,7 +340,46 @@ class NetkeibaScraper:
                      payout['payout'], payout.get('popularity'))
                 )
 
-            self.logger.info(f"Saved {len(race_results)} results and {len(payouts)} payouts for race {race_id}")
+            # 注目馬短評を保存（プレミアム情報）
+            for review in horse_short_reviews:
+                self.db_manager.insert_horse_short_review(review)
+
+            # 調教タイムと厩舎コメントを取得（オプション、追加リクエストが必要）
+            if fetch_premium_training and self.is_logged_in:
+                for result in race_results:
+                    horse_id = result.get('horse_id')
+                    if not horse_id:
+                        continue
+
+                    # 調教タイムを取得
+                    training_url = urljoin(self.base_url, f"horse/{horse_id}/training/{race_id}/")
+                    training_html = self.fetch_url(training_url)
+                    if training_html:
+                        training_times = self.parser.parse_training_times(training_html, horse_id, race_id)
+                        for training in training_times:
+                            self.db_manager.insert_training_detail(training)
+                        self.logger.debug(f"Saved {len(training_times)} training records for horse {horse_id}")
+
+                    # 厩舎コメントを取得
+                    comment_url = urljoin(self.base_url, f"horse/{horse_id}/comment/{race_id}/")
+                    comment_html = self.fetch_url(comment_url)
+                    if comment_html:
+                        comment = self.parser.parse_stable_comment(comment_html, horse_id, race_id)
+                        if comment:
+                            self.db_manager.insert_stable_comment({
+                                'horse_id': horse_id,
+                                'race_id': race_id,
+                                'comment': comment
+                            })
+                            self.logger.debug(f"Saved stable comment for horse {horse_id}")
+
+            premium_msg = ""
+            if self.is_logged_in:
+                premium_msg = f", {len(horse_short_reviews)} reviews"
+                if fetch_premium_training:
+                    premium_msg += " (with training data)"
+
+            self.logger.info(f"Saved {len(race_results)} results, {len(payouts)} payouts{premium_msg} for race {race_id}")
             return True
 
         except Exception as e:

@@ -149,8 +149,9 @@ class DatabaseManager:
         query = """
         INSERT OR REPLACE INTO races
         (race_id, race_name, date, venue, distance, track_type, track_condition,
-         weather, race_class, prize_money, grade, race_number, start_time)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         weather, race_class, prize_money, grade, race_number, start_time,
+         track_index, track_comment, race_analysis_comment)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
             race_data.get('race_id'),
@@ -165,7 +166,10 @@ class DatabaseManager:
             race_data.get('prize_money'),
             race_data.get('grade'),
             race_data.get('race_number'),
-            race_data.get('start_time')
+            race_data.get('start_time'),
+            race_data.get('track_index'),
+            race_data.get('track_comment'),
+            race_data.get('race_analysis_comment')
         )
         try:
             self.execute_update(query, params)
@@ -222,8 +226,9 @@ class DatabaseManager:
         (race_id, horse_id, finishing_position, bracket_number, horse_number,
          jockey_id, jockey_name, jockey_weight, trainer_id, trainer_name,
          horse_weight, horse_weight_diff, odds_win, odds_place, popularity,
-         time, margin, last_3f, passing_order, running_style, disqualification)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         time, margin, last_3f, passing_order, running_style, disqualification,
+         time_index, remarks)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
             result_data.get('race_id'),
@@ -246,13 +251,113 @@ class DatabaseManager:
             result_data.get('last_3f'),
             result_data.get('passing_order'),
             result_data.get('running_style'),
-            result_data.get('disqualification')
+            result_data.get('disqualification'),
+            result_data.get('time_index'),
+            result_data.get('remarks')
         )
         try:
             self.execute_update(query, params)
             return True
         except Exception as e:
             print(f"レース結果挿入エラー: {e}")
+            return False
+
+    def insert_training_detail(self, training_data: Dict[str, Any]) -> bool:
+        """
+        調教タイム詳細情報を挿入
+
+        Args:
+            training_data: 調教データの辞書
+
+        Returns:
+            成功したかどうか
+        """
+        query = """
+        INSERT INTO training_details
+        (horse_id, race_id, training_date, course, track_condition, rider,
+         time_6f, time_5f, time_4f, time_3f, time_1f, position, intensity,
+         evaluation_text, evaluation_grade, parallel_info)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        params = (
+            training_data.get('horse_id'),
+            training_data.get('race_id'),
+            training_data.get('training_date'),
+            training_data.get('course'),
+            training_data.get('track_condition'),
+            training_data.get('rider'),
+            training_data.get('time_6f'),
+            training_data.get('time_5f'),
+            training_data.get('time_4f'),
+            training_data.get('time_3f'),
+            training_data.get('time_1f'),
+            training_data.get('position'),
+            training_data.get('intensity'),
+            training_data.get('evaluation_text'),
+            training_data.get('evaluation_grade'),
+            training_data.get('parallel_info')
+        )
+        try:
+            self.execute_update(query, params)
+            return True
+        except Exception as e:
+            print(f"調教タイム挿入エラー: {e}")
+            return False
+
+    def insert_stable_comment(self, comment_data: Dict[str, Any]) -> bool:
+        """
+        厩舎コメントを挿入
+
+        Args:
+            comment_data: 厩舎コメントデータの辞書
+
+        Returns:
+            成功したかどうか
+        """
+        query = """
+        INSERT INTO stable_comments
+        (horse_id, race_id, comment)
+        VALUES (?, ?, ?)
+        """
+        params = (
+            comment_data.get('horse_id'),
+            comment_data.get('race_id'),
+            comment_data.get('comment')
+        )
+        try:
+            self.execute_update(query, params)
+            return True
+        except Exception as e:
+            print(f"厩舎コメント挿入エラー: {e}")
+            return False
+
+    def insert_horse_short_review(self, review_data: Dict[str, Any]) -> bool:
+        """
+        注目馬短評を挿入
+
+        Args:
+            review_data: 短評データの辞書
+
+        Returns:
+            成功したかどうか
+        """
+        query = """
+        INSERT INTO horse_short_reviews
+        (race_id, horse_id, horse_name, finishing_position, review)
+        VALUES (?, ?, ?, ?, ?)
+        """
+        params = (
+            review_data.get('race_id'),
+            review_data.get('horse_id'),
+            review_data.get('horse_name'),
+            review_data.get('finishing_position'),
+            review_data.get('review')
+        )
+        try:
+            self.execute_update(query, params)
+            return True
+        except Exception as e:
+            print(f"注目馬短評挿入エラー: {e}")
             return False
 
     def get_races_by_date_range(self, start_date: str, end_date: str) -> pd.DataFrame:
