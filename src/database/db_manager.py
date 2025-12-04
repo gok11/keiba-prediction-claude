@@ -360,6 +360,34 @@ class DatabaseManager:
             print(f"注目馬短評挿入エラー: {e}")
             return False
 
+    def insert_lap_time(self, lap_data: Dict[str, Any]) -> bool:
+        """
+        ラップタイムを挿入
+
+        Args:
+            lap_data: ラップタイムデータの辞書
+
+        Returns:
+            成功したかどうか
+        """
+        query = """
+        INSERT INTO lap_times
+        (race_id, section, lap_time, pace)
+        VALUES (?, ?, ?, ?)
+        """
+        params = (
+            lap_data.get('race_id'),
+            lap_data.get('section'),
+            lap_data.get('lap_time'),
+            lap_data.get('pace')
+        )
+        try:
+            self.execute_update(query, params)
+            return True
+        except Exception as e:
+            print(f"ラップタイム挿入エラー: {e}")
+            return False
+
     def get_races_by_date_range(self, start_date: str, end_date: str) -> pd.DataFrame:
         """
         期間内のレース情報を取得

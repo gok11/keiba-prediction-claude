@@ -286,6 +286,9 @@ class NetkeibaScraper:
         # 払戻金情報をパース
         payouts = self.parser.parse_payouts(html, race_id)
 
+        # ラップタイムをパース
+        lap_times = self.parser.parse_lap_times(html, race_id)
+
         # 注目馬短評をパース（プレミアム情報が取得できている場合）
         horse_short_reviews = []
         if self.is_logged_in and premium_info:
@@ -341,6 +344,10 @@ class NetkeibaScraper:
                      payout['payout'], payout.get('popularity'))
                 )
 
+            # ラップタイムを保存
+            for lap_time in lap_times:
+                self.db_manager.insert_lap_time(lap_time)
+
             # 注目馬短評を保存（プレミアム情報）
             # horse_nameからhorse_idをマッピング
             horse_name_to_id = {result['horse_name']: result['horse_id'] for result in race_results}
@@ -388,7 +395,8 @@ class NetkeibaScraper:
                 if fetch_premium_training:
                     premium_msg += " (with training data)"
 
-            self.logger.info(f"Saved {len(race_results)} results, {len(payouts)} payouts{premium_msg} for race {race_id}")
+            lap_msg = f", {len(lap_times)} lap times" if lap_times else ""
+            self.logger.info(f"Saved {len(race_results)} results, {len(payouts)} payouts{lap_msg}{premium_msg} for race {race_id}")
             return True
 
         except Exception as e:

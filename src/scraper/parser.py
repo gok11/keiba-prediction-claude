@@ -779,3 +779,68 @@ class NetkeibaParser:
             traceback.print_exc()
 
         return None
+
+    @staticmethod
+    def parse_lap_times(html: str, race_id: str) -> List[Dict[str, Any]]:
+        """
+        レース詳細ページからラップタイムをパース
+
+        Args:
+            html: レースページのHTML
+            race_id: レースID
+
+        Returns:
+            ラップタイム情報のリスト（各区間ごとのデータ）
+        """
+        soup = BeautifulSoup(html, 'lxml')
+        lap_times = []
+
+        try:
+            # ラップタイムテーブルを探す
+            lap_table = soup.find('table', class_='result_table_02', summary='ラップタイム')
+            if not lap_table:
+                return lap_times
+
+            rows = lap_table.find_all('tr')
+            lap_row = None
+
+            # 「ラップ」行を探す
+            for row in rows:
+                th = row.find('th')
+                if th and 'ラップ' in th.text:
+                    lap_row = row
+                    break
+
+            if not lap_row:
+                return lap_times
+
+            # ラップタイムのセルを取得
+            td = lap_row.find('td', class_='race_lap_cell')
+            if not td:
+                return lap_times
+
+            # ラップタイムを「-」で分割
+            lap_text = td.text.strip()
+            lap_values = [lap.strip() for lap in lap_text.split('-')]
+
+            # 各区間のラップタイムをデータベース用に変換
+            # section: 1=0-200m, 2=200-400m, 3=400-600m...
+            for section, lap_value in enumerate(lap_values, start=1):
+                try:
+                    lap_time_float = float(lap_value)
+                    lap_times.append({
+                        'race_id': race_id,
+                        'section': section,
+                        'lap_time': lap_time_float,
+                        'pace': None  # ペース分類は現状未使用
+                    })
+                except ValueError:
+                    print(f"WARNING: Failed to parse lap time: '{lap_value}' for section {section}")
+                    continue
+
+        except Exception as e:
+            print(f"ラップタイムパースエラー: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return lap_times
