@@ -1,16 +1,16 @@
 @echo off
-REM ç«¶é¦¬ãƒ‡ãƒ¼ã‚¿é–²è¦§ãƒ„ãƒ¼ãƒ« - Windowsç”¨ãƒãƒƒãƒãƒ•ã‚¡ã‚¤ãƒ«
+REM ‹£”nƒf[ƒ^‰{——ƒc[ƒ‹ - Windows—pƒoƒbƒ`ƒtƒ@ƒCƒ‹
 
 if "%1"=="" (
-    echo ç«¶é¦¬ãƒ‡ãƒ¼ã‚¿é–²è¦§ãƒ„ãƒ¼ãƒ«
+    echo ‹£”nƒf[ƒ^‰{——ƒc[ƒ‹
     echo.
-    echo ä½¿ã„æ–¹:
-    echo   view_data.bat list              - ãƒ¬ãƒ¼ã‚¹ä¸€è¦§ã‚’è¡¨ç¤º
-    echo   view_data.bat race [ãƒ¬ãƒ¼ã‚¹ID]   - ãƒ¬ãƒ¼ã‚¹è©³ç´°ã‚’è¡¨ç¤º
-    echo   view_data.bat horse [é¦¬ID]      - é¦¬ã®éå»æˆç¸¾ã‚’è¡¨ç¤º
-    echo   view_data.bat stats             - ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹çµ±è¨ˆã‚’è¡¨ç¤º
+    echo g‚¢•û:
+    echo   view_data.bat list              - ƒŒ[ƒXˆê——‚ğ•\¦
+    echo   view_data.bat race [ƒŒ[ƒXID]   - ƒŒ[ƒXÚ×‚ğ•\¦
+    echo   view_data.bat horse [”nID]      - ”n‚Ì‰ß‹¬Ñ‚ğ•\¦
+    echo   view_data.bat stats             - ƒf[ƒ^ƒx[ƒX“Œv‚ğ•\¦
     echo.
-    echo ä¾‹:
+    echo —á:
     echo   view_data.bat list
     echo   view_data.bat race 201506010101
     echo   view_data.bat horse 2012104324
