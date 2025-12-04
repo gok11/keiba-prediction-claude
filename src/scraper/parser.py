@@ -54,6 +54,28 @@ class NetkeibaParser:
                         for cls in div.get('class'):
                             unique_classes.add(cls)
                 print(f"DEBUG: Found classes: {sorted(list(unique_classes))[:30]}")
+
+                # race_head の中身を確認
+                race_head = soup.find('div', class_='race_head')
+                if race_head:
+                    print(f"DEBUG: race_head found!")
+                    # h1タグを探す
+                    h1 = race_head.find('h1')
+                    if h1:
+                        print(f"DEBUG: race_head h1 text: {h1.text.strip()}")
+
+                # mainrace_data の中身を確認
+                mainrace_data = soup.find('div', class_='mainrace_data')
+                if mainrace_data:
+                    print(f"DEBUG: mainrace_data found!")
+                    print(f"DEBUG: mainrace_data text (first 300 chars): {mainrace_data.text.strip()[:300]}")
+
+                # data_intro の中身を確認
+                data_intro = soup.find('div', class_='data_intro')
+                if data_intro:
+                    print(f"DEBUG: data_intro found!")
+                    print(f"DEBUG: data_intro text (first 300 chars): {data_intro.text.strip()[:300]}")
+
                 return None
 
             race_data_text = race_data1.text.strip()
