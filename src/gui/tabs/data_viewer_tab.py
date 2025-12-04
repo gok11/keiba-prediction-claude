@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QDate
 from datetime import datetime, timedelta
 from src.database.db_manager import DatabaseManager
-from src.utils.config import app_config
+from src.utils.config import Config
 from src.gui.dialogs.race_detail_dialog import RaceDetailDialog
 
 
@@ -19,7 +19,8 @@ class DataViewerTab(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.db_manager = DatabaseManager(app_config.get('database.path', 'data/keiba.db'))
+        config = Config()
+        self.db_manager = DatabaseManager(config.get('database.path', 'data/keiba.db'))
         self.db_manager.connect()
         self.init_ui()
         self.load_races()
