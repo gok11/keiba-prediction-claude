@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 
 from src.gui.tabs.scraping_tab import ScrapingTab
+from src.gui.tabs.data_viewer_tab import DataViewerTab
 from src.gui.tabs.training_tab import TrainingTab
 from src.gui.tabs.backtest_tab import BacktestTab
 from src.gui.tabs.prediction_tab import PredictionTab
@@ -45,11 +46,13 @@ class MainWindow(QMainWindow):
 
         # 各タブを追加
         self.scraping_tab = ScrapingTab(self.db_manager)
+        self.data_viewer_tab = DataViewerTab()
         self.training_tab = TrainingTab(self.db_manager)
         self.backtest_tab = BacktestTab(self.db_manager)
         self.prediction_tab = PredictionTab(self.db_manager)
 
         self.tabs.addTab(self.scraping_tab, "📥 データ収集")
+        self.tabs.addTab(self.data_viewer_tab, "📖 データ閲覧")
         self.tabs.addTab(self.training_tab, "🤖 トレーニング")
         self.tabs.addTab(self.backtest_tab, "📊 バックテスト")
         self.tabs.addTab(self.prediction_tab, "🎯 本番予想")
