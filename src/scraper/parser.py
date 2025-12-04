@@ -15,7 +15,7 @@ class NetkeibaParser:
     @staticmethod
     def parse_race_info(html: str, race_id: str) -> Optional[Dict[str, Any]]:
         """
-        レース情報をパース
+        レース情報をパース（新しいHTML構造に対応）
 
         Args:
             html: レースページのHTML
@@ -27,109 +27,96 @@ class NetkeibaParser:
         soup = BeautifulSoup(html, 'lxml')
 
         try:
-            # デバッグ: HTMLの先頭500文字を確認
-            print(f"DEBUG parse_race_info: HTML length = {len(html)}")
-            print(f"DEBUG parse_race_info: HTML preview:\n{html[:500]}")
+            # レース名を取得（race_head > h1）
+            race_head = soup.find('div', class_='race_head')
+            race_name = ""
+            if race_head:
+                h1 = race_head.find('h1')
+                if h1:
+                    race_name = h1.text.strip()
 
-            # レース名
-            race_name_tag = soup.find('div', class_='RaceName')
-            print(f"DEBUG: race_name_tag found = {race_name_tag is not None}")
-            if race_name_tag:
-                print(f"DEBUG: race_name = {race_name_tag.text.strip()}")
-            race_name = race_name_tag.text.strip() if race_name_tag else ""
-
-            # レース情報（距離、馬場状態など）
-            race_data1 = soup.find('div', class_='RaceData01')
-            print(f"DEBUG: race_data1 found = {race_data1 is not None}")
-            if race_data1:
-                print(f"DEBUG: race_data1 text = {race_data1.text.strip()}")
-
-            if not race_data1:
-                print(f"DEBUG: RaceData01 not found, searching for similar classes...")
-                # 全てのdivタグでクラス名を確認
-                all_divs_with_class = soup.find_all('div', class_=True)
-                unique_classes = set()
-                for div in all_divs_with_class[:20]:  # 最初の20個
-                    if div.get('class'):
-                        for cls in div.get('class'):
-                            unique_classes.add(cls)
-                print(f"DEBUG: Found classes: {sorted(list(unique_classes))[:30]}")
-
-                # race_head の中身を確認
-                race_head = soup.find('div', class_='race_head')
-                if race_head:
-                    print(f"DEBUG: race_head found!")
-                    # h1タグを探す
-                    h1 = race_head.find('h1')
-                    if h1:
-                        print(f"DEBUG: race_head h1 text: {h1.text.strip()}")
-
-                # mainrace_data の中身を確認
-                mainrace_data = soup.find('div', class_='mainrace_data')
-                if mainrace_data:
-                    print(f"DEBUG: mainrace_data found!")
-                    print(f"DEBUG: mainrace_data text (first 300 chars): {mainrace_data.text.strip()[:300]}")
-
-                # data_intro の中身を確認
-                data_intro = soup.find('div', class_='data_intro')
-                if data_intro:
-                    print(f"DEBUG: data_intro found!")
-                    print(f"DEBUG: data_intro text (first 300 chars): {data_intro.text.strip()[:300]}")
-
+            if not race_name:
+                print(f"DEBUG: レース名が見つかりませんでした for {race_id}")
                 return None
 
-            race_data_text = race_data1.text.strip()
+            # レース詳細情報を取得（data_intro または mainrace_data）
+            data_intro = soup.find('div', class_='data_intro')
+            if not data_intro:
+                data_intro = soup.find('div', class_='mainrace_data')
 
-            # 距離と馬場種別を抽出
-            distance_match = re.search(r'(芝|ダート|障害)(\d+)m', race_data_text)
-            track_type = distance_match.group(1) if distance_match else ""
-            distance = int(distance_match.group(2)) if distance_match else 0
+            if not data_intro:
+                print(f"DEBUG: レース詳細情報が見つかりませんでした for {race_id}")
+                return None
 
-            # 馬場状態
-            track_condition_match = re.search(r'馬場:(良|稍重|重|不良)', race_data_text)
-            track_condition = track_condition_match.group(1) if track_condition_match else ""
+            race_data_text = data_intro.text.strip()
+
+            # 距離と馬場種別を抽出（芝、ダート、障害）
+            # 例: "ダ右1200m" または "芝1600m"
+            distance_match = re.search(r'(芝|ダ|ダート|障害)[^0-9]*(\d+)m', race_data_text)
+            track_type = ""
+            distance = 0
+            if distance_match:
+                track_type_raw = distance_match.group(1)
+                # "ダ" を "ダート" に正規化
+                if track_type_raw == "ダ":
+                    track_type = "ダート"
+                else:
+                    track_type = track_type_raw
+                distance = int(distance_match.group(2))
+
+            # 馬場状態（芝の場合は "芝 : 良"、ダートの場合は "ダート : 良"）
+            track_condition = ""
+            if track_type == "芝":
+                condition_match = re.search(r'芝\s*[:：]\s*(良|稍重|重|不良)', race_data_text)
+                if condition_match:
+                    track_condition = condition_match.group(1)
+            elif track_type == "ダート":
+                condition_match = re.search(r'ダート\s*[:：]\s*(良|稍重|重|不良)', race_data_text)
+                if condition_match:
+                    track_condition = condition_match.group(1)
 
             # 天気
-            weather_match = re.search(r'天候:(晴|曇|雨|雪|小雨|小雪)', race_data_text)
-            weather = weather_match.group(1) if weather_match else ""
+            weather = ""
+            weather_match = re.search(r'天候\s*[:：]\s*(晴|曇|雨|雪|小雨|小雪)', race_data_text)
+            if weather_match:
+                weather = weather_match.group(1)
 
-            # 開催情報から日付と競馬場を抽出
-            race_data2 = soup.find('div', class_='RaceData02')
+            # 日付と競馬場を抽出
+            # 例: "2020年01月05日 1回中山1日目"
             date_str = ""
             venue = ""
+            date_match = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日', race_data_text)
+            if date_match:
+                year, month, day = date_match.groups()
+                date_str = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
 
-            if race_data2:
-                # 日付
-                date_match = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日', race_data2.text)
-                if date_match:
-                    year, month, day = date_match.groups()
-                    date_str = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
-
-                # 競馬場
-                venue_match = re.search(r'(札幌|函館|福島|新潟|東京|中山|中京|京都|阪神|小倉)', race_data2.text)
-                venue = venue_match.group(1) if venue_match else ""
+            venue_match = re.search(r'(札幌|函館|福島|新潟|東京|中山|中京|京都|阪神|小倉)', race_data_text)
+            if venue_match:
+                venue = venue_match.group(1)
 
             # レースクラス
             race_class = ""
             grade = ""
-            if 'G1' in race_name or 'ＧⅠ' in race_name:
+            if 'G1' in race_name or 'ＧⅠ' in race_name or 'GⅠ' in race_name:
                 grade = "G1"
-            elif 'G2' in race_name or 'ＧⅡ' in race_name:
+            elif 'G2' in race_name or 'ＧⅡ' in race_name or 'GⅡ' in race_name:
                 grade = "G2"
-            elif 'G3' in race_name or 'ＧⅢ' in race_name:
+            elif 'G3' in race_name or 'ＧⅢ' in race_name or 'GⅢ' in race_name:
                 grade = "G3"
-            elif 'オープン' in race_data_text or 'OP' in race_data_text:
+            elif 'オープン' in race_name or 'OP' in race_name or 'オープン' in race_data_text:
                 race_class = "オープン"
-            elif '3勝' in race_data_text:
+            elif '3勝' in race_name or '3勝' in race_data_text:
                 race_class = "3勝クラス"
-            elif '2勝' in race_data_text:
+            elif '2勝' in race_name or '2勝' in race_data_text:
                 race_class = "2勝クラス"
-            elif '1勝' in race_data_text:
+            elif '1勝' in race_name or '1勝' in race_data_text:
                 race_class = "1勝クラス"
-            elif '未勝利' in race_data_text:
+            elif '未勝利' in race_name or '未勝利' in race_data_text:
                 race_class = "未勝利"
-            elif '新馬' in race_data_text:
+            elif '新馬' in race_name or '新馬' in race_data_text:
                 race_class = "新馬"
+
+            print(f"DEBUG: Successfully parsed race {race_id}: {race_name}, {venue}, {date_str}, {track_type}{distance}m")
 
             return {
                 'race_id': race_id,
