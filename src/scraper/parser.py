@@ -27,13 +27,33 @@ class NetkeibaParser:
         soup = BeautifulSoup(html, 'lxml')
 
         try:
+            # デバッグ: HTMLの先頭500文字を確認
+            print(f"DEBUG parse_race_info: HTML length = {len(html)}")
+            print(f"DEBUG parse_race_info: HTML preview:\n{html[:500]}")
+
             # レース名
             race_name_tag = soup.find('div', class_='RaceName')
+            print(f"DEBUG: race_name_tag found = {race_name_tag is not None}")
+            if race_name_tag:
+                print(f"DEBUG: race_name = {race_name_tag.text.strip()}")
             race_name = race_name_tag.text.strip() if race_name_tag else ""
 
             # レース情報（距離、馬場状態など）
             race_data1 = soup.find('div', class_='RaceData01')
+            print(f"DEBUG: race_data1 found = {race_data1 is not None}")
+            if race_data1:
+                print(f"DEBUG: race_data1 text = {race_data1.text.strip()}")
+
             if not race_data1:
+                print(f"DEBUG: RaceData01 not found, searching for similar classes...")
+                # 全てのdivタグでクラス名を確認
+                all_divs_with_class = soup.find_all('div', class_=True)
+                unique_classes = set()
+                for div in all_divs_with_class[:20]:  # 最初の20個
+                    if div.get('class'):
+                        for cls in div.get('class'):
+                            unique_classes.add(cls)
+                print(f"DEBUG: Found classes: {sorted(list(unique_classes))[:30]}")
                 return None
 
             race_data_text = race_data1.text.strip()
