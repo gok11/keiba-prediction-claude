@@ -72,6 +72,9 @@ class NetkeibaScraper:
             'results_saved': 0
         }
 
+        # 失敗したレースを記録
+        self.failed_races = []
+
     def fetch_url(self, url: str, retries: int = 3) -> Optional[str]:
         """
         URLからHTMLを取得
@@ -262,6 +265,12 @@ class NetkeibaScraper:
 
         except Exception as e:
             self.logger.error(f"Database error for race {race_id}: {e}")
+            # 失敗したレースを記録
+            self.failed_races.append({
+                'race_id': race_id,
+                'error': str(e),
+                'race_name': race_info.get('race_name', 'Unknown') if race_info else 'Unknown'
+            })
             return False
 
     def scrape_date_range(self, start_date: datetime, end_date: datetime,
@@ -289,6 +298,10 @@ class NetkeibaScraper:
 
         # 最終統計
         self._log_stats()
+
+        # 失敗したレースを保存
+        self._save_failed_races()
+
         self.logger.info("Scraping completed")
 
         return self.stats
@@ -463,6 +476,121 @@ class NetkeibaScraper:
         if total_processed > 0:
             skip_rate = (self.stats['races_skipped'] / total_processed) * 100
             self.logger.info(f"Skip efficiency: {skip_rate:.1f}% (saved {self.stats['races_skipped']} HTTP requests)")
+
+        # 失敗したレース情報を表示
+        if self.failed_races:
+            self.logger.warning(f"❌ Failed races: {len(self.failed_races)}")
+            self.logger.warning("Failed race details:")
+            for failed in self.failed_races[:10]:  # 最初の10件のみ表示
+                self.logger.warning(f"  - {failed['race_id']}: {failed['race_name']} - Error: {failed['error'][:50]}")
+            if len(self.failed_races) > 10:
+                self.logger.warning(f"  ... and {len(self.failed_races) - 10} more (see data/failed_races.txt)")
+
+    def _save_failed_races(self):
+        """失敗したレースをファイルに保存"""
+        if not self.failed_races:
+            return
+
+        import os
+        from datetime import datetime as dt
+
+        # data ディレクトリを作成
+        os.makedirs('data', exist_ok=True)
+
+        # タイムスタンプ付きファイル名
+        timestamp = dt.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'data/failed_races_{timestamp}.txt'
+
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(f"Failed Races - {dt.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"Total: {len(self.failed_races)}\n")
+                f.write("=" * 80 + "\n\n")
+
+                for failed in self.failed_races:
+                    f.write(f"Race ID: {failed['race_id']}\n")
+                    f.write(f"Race Name: {failed['race_name']}\n")
+                    f.write(f"Error: {failed['error']}\n")
+                    f.write("-" * 80 + "\n")
+
+            self.logger.info(f"Failed races saved to: {filename}")
+
+            # 失敗したレースIDのみのファイルも作成（再実行用）
+            retry_filename = 'data/retry_race_ids.txt'
+            with open(retry_filename, 'w', encoding='utf-8') as f:
+                for failed in self.failed_races:
+                    f.write(f"{failed['race_id']}\n")
+
+            self.logger.info(f"Retry race IDs saved to: {retry_filename}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to save failed races: {e}")
+
+    def retry_failed_races(self, race_ids_file: str = 'data/retry_race_ids.txt',
+                           fetch_pedigree: bool = False,
+                           progress_callback=None) -> Dict[str, int]:
+        """
+        失敗したレースIDのリストから再スクレイピング
+
+        Args:
+            race_ids_file: レースIDリストファイル
+            fetch_pedigree: 血統情報を取得するか
+            progress_callback: 進捗コールバック
+
+        Returns:
+            統計情報の辞書
+        """
+        import os
+
+        if not os.path.exists(race_ids_file):
+            self.logger.error(f"Race IDs file not found: {race_ids_file}")
+            return self.stats
+
+        # ファイルからレースIDを読み込み
+        race_ids = []
+        with open(race_ids_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                race_id = line.strip()
+                if race_id and race_id.isdigit() and len(race_id) == 12:
+                    race_ids.append(race_id)
+
+        self.logger.info(f"Loaded {len(race_ids)} race IDs from {race_ids_file}")
+
+        if not race_ids:
+            self.logger.warning("No valid race IDs found in file")
+            return self.stats
+
+        # 統計と失敗リストをリセット
+        self.stats = {
+            'total_requests': 0,
+            'successful_requests': 0,
+            'failed_requests': 0,
+            'races_saved': 0,
+            'races_skipped': 0,
+            'results_saved': 0
+        }
+        self.failed_races = []
+
+        # 各レースをスクレイピング
+        total = len(race_ids)
+        for idx, race_id in enumerate(race_ids, 1):
+            if progress_callback:
+                msg = f"Retrying {race_id} ({idx}/{total}) (Saved: {self.stats['races_saved']}, Failed: {len(self.failed_races)})"
+                progress_callback(idx, total, msg)
+
+            self.scrape_race(race_id, fetch_pedigree=fetch_pedigree, skip_db_check=False)
+
+            # 定期的に統計を出力
+            if idx % 10 == 0:
+                self._log_stats()
+
+        # 最終統計
+        self._log_stats()
+        self._save_failed_races()
+
+        self.logger.info("Retry completed")
+
+        return self.stats
 
     def close(self):
         """セッションをクローズ"""
