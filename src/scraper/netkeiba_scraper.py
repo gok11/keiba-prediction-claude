@@ -341,8 +341,16 @@ class NetkeibaScraper:
                 )
 
             # 注目馬短評を保存（プレミアム情報）
+            # horse_nameからhorse_idをマッピング
+            horse_name_to_id = {result['horse_name']: result['horse_id'] for result in race_results}
             for review in horse_short_reviews:
-                self.db_manager.insert_horse_short_review(review)
+                # 馬名からhorse_idを取得
+                horse_name = review.get('horse_name')
+                if horse_name in horse_name_to_id:
+                    review['horse_id'] = horse_name_to_id[horse_name]
+                    self.db_manager.insert_horse_short_review(review)
+                else:
+                    self.logger.warning(f"Horse not found in results: {horse_name}")
 
             # 調教タイムと厩舎コメントを取得（オプション、追加リクエストが必要）
             if fetch_premium_training and self.is_logged_in:
