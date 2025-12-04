@@ -315,17 +315,29 @@ class DatabaseManager:
 
     def race_exists(self, race_id: str) -> bool:
         """
-        レースが既にデータベースに存在するかチェック
+        レースが既にデータベースに存在し、結果も保存されているかチェック
+        （中途半端なスクレイプを防ぐため、レース結果の存在も確認）
 
         Args:
             race_id: レースID
 
         Returns:
-            存在する場合True
+            レース情報と結果の両方が存在する場合True
         """
+        # レース情報の存在をチェック
         query = "SELECT COUNT(*) FROM races WHERE race_id = ?"
         result = self.execute_query(query, (race_id,))
-        return result[0][0] > 0 if result else False
+        race_exists = result[0][0] > 0 if result else False
+
+        if not race_exists:
+            return False
+
+        # レース結果の存在もチェック（最低1件以上）
+        query = "SELECT COUNT(*) FROM race_results WHERE race_id = ?"
+        result = self.execute_query(query, (race_id,))
+        results_exist = result[0][0] > 0 if result else False
+
+        return race_exists and results_exist
 
     def get_statistics(self) -> Dict[str, int]:
         """

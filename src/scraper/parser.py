@@ -36,7 +36,6 @@ class NetkeibaParser:
                     race_name = h1.text.strip()
 
             if not race_name:
-                print(f"DEBUG: レース名が見つかりませんでした for {race_id}")
                 return None
 
             # レース詳細情報を取得（data_intro または mainrace_data）
@@ -45,7 +44,6 @@ class NetkeibaParser:
                 data_intro = soup.find('div', class_='mainrace_data')
 
             if not data_intro:
-                print(f"DEBUG: レース詳細情報が見つかりませんでした for {race_id}")
                 return None
 
             race_data_text = data_intro.text.strip()
@@ -116,8 +114,6 @@ class NetkeibaParser:
             elif '新馬' in race_name or '新馬' in race_data_text:
                 race_class = "新馬"
 
-            print(f"DEBUG: Successfully parsed race {race_id}: {race_name}, {venue}, {date_str}, {track_type}{distance}m")
-
             return {
                 'race_id': race_id,
                 'race_name': race_name,
@@ -155,11 +151,9 @@ class NetkeibaParser:
             result_table = soup.find('table', class_='race_table_01')
 
             if not result_table:
-                print(f"DEBUG: race_table_01 not found for {race_id}")
                 return results
 
             rows = result_table.find_all('tr')
-            print(f"DEBUG: Found {len(rows)} rows in result table for {race_id}")
 
             for row in rows[1:]:  # ヘッダー行をスキップ
                 cols = row.find_all('td')
@@ -338,8 +332,8 @@ class NetkeibaParser:
         payouts = []
 
         try:
-            # 払戻金テーブルを取得
-            payout_table = soup.find('table', class_='Payout')
+            # 払戻金テーブルを取得（新しいHTML構造: pay_table_01）
+            payout_table = soup.find('table', class_='pay_table_01')
             if not payout_table:
                 return payouts
 
