@@ -421,34 +421,20 @@ class NetkeibaParser:
     @staticmethod
     def parse_race_list(html: str) -> List[str]:
         """
-        日付別レースリストページからレースIDを抽出
+        日付別レースリストページからレースIDを抽出（JRA中央競馬のみ）
 
         Args:
             html: レースリストページのHTML
 
         Returns:
-            レースIDのリスト
+            レースIDのリスト（JRA中央競馬のみ：競馬場コード01-10）
         """
         soup = BeautifulSoup(html, 'lxml')
         race_ids = []
 
         try:
-            # HTMLの一部をデバッグ出力
-            print(f"DEBUG: HTML length: {len(html)}")
-            print(f"DEBUG: HTML preview (first 500 chars):\n{html[:500]}")
-
             # レースへのリンクを全て取得
-            # 通常、レースIDはURLに含まれている: /race/202305010212/ など
             all_links = soup.find_all('a', href=True)
-            print(f"DEBUG: Total links found: {len(all_links)}")
-
-            # レースIDパターンにマッチするリンクのみ
-            race_links = [link for link in all_links if re.search(r'/race/\d{12}/?', link.get('href', ''))]
-            print(f"DEBUG: Race links found: {len(race_links)}")
-
-            for link in race_links[:5]:  # 最初の5件だけデバッグ出力
-                href = link.get('href')
-                print(f"DEBUG: Link href: {href}, text: {link.text.strip()[:50]}")
 
             for link in all_links:
                 href = link.get('href', '')
@@ -456,10 +442,14 @@ class NetkeibaParser:
                 match = re.search(r'/race/(\d{12})/?', href)
                 if match:
                     race_id = match.group(1)
-                    if race_id not in race_ids:  # 重複排除
-                        race_ids.append(race_id)
 
-            print(f"DEBUG: Extracted race_ids: {race_ids[:10]}")  # 最初の10件
+                    # JRA中央競馬のみフィルタリング（競馬場コード01-10）
+                    # フォーマット: 年(4) + 競馬場(2) + 回次(2) + 日次(2) + レース番号(2)
+                    venue_code = race_id[4:6]  # 5-6桁目が競馬場コード
+
+                    if venue_code.isdigit() and 1 <= int(venue_code) <= 10:
+                        if race_id not in race_ids:  # 重複排除
+                            race_ids.append(race_id)
 
         except Exception as e:
             print(f"レースリストパースエラー: {e}")
