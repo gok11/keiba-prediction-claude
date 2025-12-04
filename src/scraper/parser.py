@@ -603,17 +603,19 @@ class NetkeibaParser:
                     if th:
                         # 馬名と着順を取得（例: "1着:オイデヤスダイジン"）
                         horse_info = th.text.strip()
-                        if ':' in horse_info:
-                            position_str, horse_name = horse_info.split(':', 1)
-                            position_match = re.search(r'(\d+)着', position_str)
-                            finishing_position = int(position_match.group(1)) if position_match else None
-                            current_horse = {
-                                'race_id': race_id,  # race_idを追加
-                                'horse_id': None,  # horse_idは後でスクレイパーで設定
-                                'horse_name': horse_name.strip(),
-                                'finishing_position': finishing_position,
-                                'review': None
-                            }
+                        # ヘッダー行や無効なデータをスキップ
+                        if ':' not in horse_info:
+                            continue
+                        position_str, horse_name = horse_info.split(':', 1)
+                        position_match = re.search(r'(\d+)着', position_str)
+                        finishing_position = int(position_match.group(1)) if position_match else None
+                        current_horse = {
+                            'race_id': race_id,  # race_idを追加
+                            'horse_id': None,  # horse_idは後でスクレイパーで設定
+                            'horse_name': horse_name.strip(),
+                            'finishing_position': finishing_position,
+                            'review': None
+                        }
                     elif td and current_horse:
                         # 短評を取得
                         current_horse['review'] = td.text.strip()
