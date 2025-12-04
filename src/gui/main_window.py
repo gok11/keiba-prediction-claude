@@ -3,6 +3,8 @@
 競馬予想アプリのメインウィンドウとタブ構成を管理
 """
 
+import os
+from dotenv import load_dotenv
 from PyQt6.QtWidgets import (
     QMainWindow, QTabWidget, QWidget, QVBoxLayout,
     QStatusBar, QMenuBar, QMenu, QMessageBox
@@ -26,6 +28,7 @@ class MainWindow(QMainWindow):
         self.db_manager = DatabaseManager()
         self.init_ui()
         self.setup_menu()
+        self.check_premium_login()
 
     def init_ui(self):
         """UIの初期化"""
@@ -120,6 +123,51 @@ class MainWindow(QMainWindow):
             "<p>機械学習を用いた競馬予想アプリケーション</p>"
             "<p>© 2025</p>"
         )
+
+    def check_premium_login(self):
+        """プレミアム会員のログイン状態を確認"""
+        # .envファイルから認証情報を読み込み
+        load_dotenv()
+        username = os.getenv('NETKEIBA_USERNAME')
+        password = os.getenv('NETKEIBA_PASSWORD')
+
+        if not username or not password:
+            # ログイン情報がない場合は無料会員として動作
+            self.status_bar.showMessage("💡 無料会員モードで起動（プレミアム情報は取得されません）")
+            return
+
+        # ログイン試行
+        try:
+            from src.scraper.netkeiba_scraper import NetkeibaScraper
+            from src.utils.config import Config
+
+            # 一時的にスクレイパーを作成してログインテスト
+            config = Config()
+            scraper = NetkeibaScraper(self.db_manager, config)
+
+            if scraper.is_logged_in:
+                self.status_bar.showMessage("✅ プレミアム会員ログイン成功")
+            else:
+                self.status_bar.showMessage("⚠️ プレミアム会員ログイン失敗 - 認証情報を確認してください")
+                QMessageBox.warning(
+                    self,
+                    "ログイン失敗",
+                    "netkeiba.comへのログインに失敗しました。\n\n"
+                    "以下を確認してください：\n"
+                    "1. .envファイルにNETKEIBA_USERNAMEとNETKEIBA_PASSWORDが設定されているか\n"
+                    "2. 認証情報が正しいか\n"
+                    "3. インターネット接続が正常か\n\n"
+                    "プレミアム情報は取得されません。"
+                )
+
+        except Exception as e:
+            self.status_bar.showMessage(f"⚠️ ログイン確認エラー: {str(e)}")
+            QMessageBox.warning(
+                self,
+                "エラー",
+                f"ログイン確認中にエラーが発生しました:\n{str(e)}\n\n"
+                "プレミアム情報は取得されません。"
+            )
 
     def apply_styles(self):
         """アプリケーションのスタイルを適用"""
