@@ -38,9 +38,21 @@ class DataViewerTab(QWidget):
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("期間:"))
 
-        # デフォルトは過去30日間
-        end_date = QDate.currentDate()
-        start_date = end_date.addDays(-30)
+        # 保存された日付範囲を読み込む、なければ過去30日間
+        config = Config()
+        saved_start = config.get("data_viewer.start_date")
+        saved_end = config.get("data_viewer.end_date")
+
+        if saved_start and saved_end:
+            try:
+                start_date = QDate.fromString(saved_start, "yyyy-MM-dd")
+                end_date = QDate.fromString(saved_end, "yyyy-MM-dd")
+            except:
+                end_date = QDate.currentDate()
+                start_date = end_date.addDays(-30)
+        else:
+            end_date = QDate.currentDate()
+            start_date = end_date.addDays(-30)
 
         self.start_date_edit = QDateEdit()
         self.start_date_edit.setDate(start_date)
@@ -117,6 +129,16 @@ class DataViewerTab(QWidget):
         """レース一覧を読み込み"""
         start_date = self.start_date_edit.date().toString("yyyy-MM-dd")
         end_date = self.end_date_edit.date().toString("yyyy-MM-dd")
+
+        # 検索条件を保存
+        config = Config()
+        config.set("data_viewer.start_date", start_date)
+        config.set("data_viewer.end_date", end_date)
+        try:
+            config.save()
+        except Exception as e:
+            # 保存に失敗してもエラーは無視（次回保存時に再試行）
+            pass
 
         query = """
         SELECT race_id, date, venue, race_number, race_name, grade, distance,
