@@ -91,6 +91,9 @@ class NetkeibaScraper:
                 response = self.session.get(url, timeout=self.timeout)
                 response.raise_for_status()
 
+                # netkeibaはEUC-JPエンコーディングを使用
+                response.encoding = 'euc-jp'
+
                 self.stats['successful_requests'] += 1
 
                 # スリープ（サーバー負荷軽減）
