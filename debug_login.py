@@ -42,23 +42,38 @@ try:
 
     # HTMLをパースして、ログインフォームを確認
     soup = BeautifulSoup(login_page.text, 'html.parser')
-    form = soup.find('form', {'name': 'login_form'}) or soup.find('form')
 
-    if form:
-        print("\n  ログインフォームを検出:")
-        # すべてのinputフィールドを表示
+    # すべてのフォームを検出
+    all_forms = soup.find_all('form')
+    print(f"\n  検出されたフォーム数: {len(all_forms)}")
+
+    # ログインフォームを探す（login_idまたはpswdを含むフォーム）
+    login_form = None
+    for idx, form in enumerate(all_forms):
+        print(f"\n  フォーム #{idx + 1}:")
+        print(f"    action: {form.get('action', 'なし')}")
+        print(f"    method: {form.get('method', 'なし')}")
+
         inputs = form.find_all('input')
-        for inp in inputs:
-            name = inp.get('name', '')
-            type_ = inp.get('type', '')
-            value = inp.get('value', '')
-            print(f"    - {name} (type={type_}, value={value[:20] if value else ''})")
-    else:
-        print("  ⚠️ ログインフォームが見つかりません")
-        # ページの一部を保存
-        with open('debug_login_page.html', 'w', encoding='utf-8') as f:
-            f.write(login_page.text)
-        print("  → debug_login_page.htmlに保存しました")
+        input_names = [inp.get('name', '') for inp in inputs]
+        print(f"    inputs: {', '.join(filter(None, input_names))}")
+
+        # login_idやpswdを含むフォームをログインフォームとする
+        if 'login_id' in input_names or 'pswd' in input_names:
+            login_form = form
+            print(f"    → これがログインフォームです！")
+
+    # ページの一部を保存
+    with open('debug_login_page.html', 'w', encoding='utf-8') as f:
+        f.write(login_page.text)
+    print(f"\n  → debug_login_page.htmlに保存しました")
+
+    if not login_form:
+        print("\n  ❌ ログインフォームが見つかりません")
+        print("  → debug_login_page.htmlを確認してください")
+        sys.exit(1)
+
+    form = login_form
 
 except Exception as e:
     print(f"  ❌ エラー: {e}")
