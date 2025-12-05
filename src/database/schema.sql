@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS horses (
     sire TEXT,  -- 父
     dam TEXT,   -- 母
     damsire TEXT,  -- 母父
+    sire_sire TEXT,  -- 父父
+    sire_dam TEXT,   -- 父母
+    dam_dam TEXT,    -- 母母
     breeder TEXT,  -- 生産者
     owner TEXT,  -- 馬主
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

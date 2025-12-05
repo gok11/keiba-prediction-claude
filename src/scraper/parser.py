@@ -470,7 +470,7 @@ class NetkeibaParser:
             horse_id: 馬ID
 
         Returns:
-            血統情報の辞書（sire, dam, damsire）
+            血統情報の辞書（sire, dam, damsire, sire_sire, sire_dam, dam_dam）
         """
         soup = BeautifulSoup(html, 'lxml')
         pedigree = {}
@@ -507,21 +507,41 @@ class NetkeibaParser:
                             pedigree['dam'] = link.text.strip()
                         break
 
-                # 母父: 母の後の rowspan="8" かつ class="b_ml"
-                # 血統詳細ページの構造: 父(rowspan=16), 母(rowspan=16), 母父(rowspan=8)
-                dam_found = False
-                for cell in cells:
-                    # 母を見つけた
-                    if 'b_fml' in cell.get('class', []) and cell.get('rowspan') == '16':
-                        dam_found = True
-                        continue
+                # rowspan="8" のセルを探す（祖父母）
+                # 順番：父父(b_ml), 父母(b_fml), 母父(b_ml), 母母(b_fml)
+                rowspan_8_cells = [cell for cell in cells if cell.get('rowspan') == '8']
 
-                    # 母の後のrowspan="8"でclass="b_ml"のセルが母父
-                    if dam_found and 'b_ml' in cell.get('class', []) and cell.get('rowspan') == '8':
-                        link = cell.find('a')
-                        if link:
-                            pedigree['damsire'] = link.text.strip()
-                        break
+                # b_ml (male line) と b_fml (female line) で分類
+                ml_cells = [cell for cell in rowspan_8_cells if 'b_ml' in cell.get('class', [])]
+                fml_cells = [cell for cell in rowspan_8_cells if 'b_fml' in cell.get('class', [])]
+
+                # 父父: 最初の b_ml
+                if len(ml_cells) >= 1:
+                    link = ml_cells[0].find('a')
+                    if link:
+                        # 改行で分割して最初の行（馬名）のみを取得
+                        pedigree['sire_sire'] = link.text.strip().split('\n')[0].strip()
+
+                # 父母: 最初の b_fml
+                if len(fml_cells) >= 1:
+                    link = fml_cells[0].find('a')
+                    if link:
+                        # 改行で分割して最初の行（馬名）のみを取得
+                        pedigree['sire_dam'] = link.text.strip().split('\n')[0].strip()
+
+                # 母父: 2番目の b_ml
+                if len(ml_cells) >= 2:
+                    link = ml_cells[1].find('a')
+                    if link:
+                        # 改行で分割して最初の行（馬名）のみを取得
+                        pedigree['damsire'] = link.text.strip().split('\n')[0].strip()
+
+                # 母母: 2番目の b_fml
+                if len(fml_cells) >= 2:
+                    link = fml_cells[1].find('a')
+                    if link:
+                        # 改行で分割して最初の行（馬名）のみを取得
+                        pedigree['dam_dam'] = link.text.strip().split('\n')[0].strip()
 
         except Exception as e:
             print(f"血統情報パースエラー: {e}")

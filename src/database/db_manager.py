@@ -46,6 +46,9 @@ class DatabaseManager:
         if cursor.fetchone() is None:
             print("データベースが初期化されていません。自動初期化を実行します...")
             self.initialize_database()
+        else:
+            # 既存のデータベースに対してマイグレーションを実行
+            self.run_migrations()
 
     def disconnect(self):
         """データベース接続を切断"""
@@ -71,6 +74,31 @@ class DatabaseManager:
         conn.commit()
 
         print(f"データベースを初期化しました: {self.db_path}")
+
+    def run_migrations(self):
+        """既存のデータベースに対してマイグレーションを実行"""
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        # horsesテーブルにsire_sire, sire_dam, dam_damカラムがあるかチェック
+        cursor.execute("PRAGMA table_info(horses)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        # 不足しているカラムを追加
+        migrations = []
+        if 'sire_sire' not in columns:
+            migrations.append("ALTER TABLE horses ADD COLUMN sire_sire TEXT")
+        if 'sire_dam' not in columns:
+            migrations.append("ALTER TABLE horses ADD COLUMN sire_dam TEXT")
+        if 'dam_dam' not in columns:
+            migrations.append("ALTER TABLE horses ADD COLUMN dam_dam TEXT")
+
+        if migrations:
+            print(f"マイグレーションを実行中... ({len(migrations)}個のカラムを追加)")
+            for migration in migrations:
+                cursor.execute(migration)
+            conn.commit()
+            print("マイグレーション完了")
 
     def execute_query(self, query: str, params: tuple = ()) -> List[sqlite3.Row]:
         """
@@ -190,8 +218,8 @@ class DatabaseManager:
         """
         query = """
         INSERT OR REPLACE INTO horses
-        (horse_id, horse_name, birth_date, sex, sire, dam, damsire, breeder, owner)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (horse_id, horse_name, birth_date, sex, sire, dam, damsire, sire_sire, sire_dam, dam_dam, breeder, owner)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
             horse_data.get('horse_id'),
@@ -201,6 +229,9 @@ class DatabaseManager:
             horse_data.get('sire'),
             horse_data.get('dam'),
             horse_data.get('damsire'),
+            horse_data.get('sire_sire'),
+            horse_data.get('sire_dam'),
+            horse_data.get('dam_dam'),
             horse_data.get('breeder'),
             horse_data.get('owner')
         )
