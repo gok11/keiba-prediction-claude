@@ -285,8 +285,8 @@ class RaceDetailDialog(QDialog):
 
             for row_idx, row_data in enumerate(laps):
                 section = f"{(row_data[0]-1)*200}-{row_data[0]*200}m"
-                lap_time = f"{row_data[1]:.1f}"
-                pace = row_data[2] if row_data[2] else ""
+                lap_time = f"{row_data[1]:.1f}" if row_data[1] else ""
+                pace = f"{row_data[2]:.1f}" if row_data[2] else ""
 
                 table.setItem(row_idx, 0, QTableWidgetItem(section))
                 table.setItem(row_idx, 1, QTableWidgetItem(lap_time))

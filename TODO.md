@@ -178,6 +178,12 @@
     - 解決: parser.py:487-506で生年月日も抽出、netkeiba_scraper.py:348-356で保存
     - 注意: 血統情報取得にはfetch_pedigree=Trueが必要（GUIでデフォルトON）
 
+- [x] lap_times.pace型変更によるレース詳細ダイアログのクラッシュ（2025-12-05）
+  - 問題: schema.sql:144でpaceをREAL型に変更したが、GUI側でfloat→str変換が未対応
+  - エラー: race_detail_dialog.py:293でQTableWidgetItemにfloatを渡してTypeError
+  - 解決: race_detail_dialog.py:289でpaceをf"{value:.1f}"形式で文字列変換
+  - 関連: scraping_tab.pyのインポートパス修正（src.config → src.utils.config）
+
 ---
 
 ## 🚧 未取得・未実装の項目（確認済み）
