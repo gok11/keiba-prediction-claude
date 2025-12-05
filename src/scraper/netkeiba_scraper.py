@@ -349,6 +349,9 @@ class NetkeibaScraper:
                 sire = None
                 dam = None
                 damsire = None
+                sire_sire = None
+                sire_dam = None
+                dam_dam = None
                 birth_date = None
 
                 if fetch_pedigree and result.get('horse_id'):
@@ -357,6 +360,9 @@ class NetkeibaScraper:
                         sire = pedigree.get('sire')
                         dam = pedigree.get('dam')
                         damsire = pedigree.get('damsire')
+                        sire_sire = pedigree.get('sire_sire')
+                        sire_dam = pedigree.get('sire_dam')
+                        dam_dam = pedigree.get('dam_dam')
                         birth_date = pedigree.get('birth_date')
 
                 # 馬情報を保存
@@ -368,6 +374,9 @@ class NetkeibaScraper:
                     'sire': sire,
                     'dam': dam,
                     'damsire': damsire,
+                    'sire_sire': sire_sire,
+                    'sire_dam': sire_dam,
+                    'dam_dam': dam_dam,
                     'breeder': None,
                     'owner': None
                 }
