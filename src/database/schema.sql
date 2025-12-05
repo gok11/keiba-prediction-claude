@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS lap_times (
     race_id TEXT NOT NULL,
     section INTEGER NOT NULL,  -- 区間（200m, 400m, 600m...）
     lap_time REAL,  -- ラップタイム
-    pace TEXT,  -- ペース分類（H, M, S など）
+    pace REAL,  -- ペース（累積時間）
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (race_id) REFERENCES races(race_id)
 );
