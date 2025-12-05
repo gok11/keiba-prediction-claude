@@ -345,6 +345,7 @@ class NetkeibaScraper:
                 sire = None
                 dam = None
                 damsire = None
+                birth_date = None
 
                 if fetch_pedigree and result.get('horse_id'):
                     pedigree = self.scrape_horse_pedigree(result['horse_id'])
@@ -352,13 +353,14 @@ class NetkeibaScraper:
                         sire = pedigree.get('sire')
                         dam = pedigree.get('dam')
                         damsire = pedigree.get('damsire')
+                        birth_date = pedigree.get('birth_date')
 
                 # 馬情報を保存
                 horse_data = {
                     'horse_id': result['horse_id'],
                     'horse_name': result['horse_name'],
                     'sex': result.get('sex'),
-                    'birth_date': None,  # 詳細ページから取得が必要
+                    'birth_date': birth_date,
                     'sire': sire,
                     'dam': dam,
                     'damsire': damsire,

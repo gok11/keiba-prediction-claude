@@ -114,6 +114,16 @@ class NetkeibaParser:
             elif '新馬' in race_name or '新馬' in race_data_text:
                 race_class = "新馬"
 
+            # race_idからレース番号を抽出
+            # フォーマット: 年(4) + 競馬場(2) + 回次(2) + 日次(2) + レース番号(2)
+            # 例: 201506010102 の最後の2桁 "02" がレース番号（2R）
+            race_number = None
+            if race_id and len(race_id) >= 12:
+                try:
+                    race_number = int(race_id[-2:])  # 最後の2桁を整数に変換
+                except ValueError:
+                    pass
+
             return {
                 'race_id': race_id,
                 'race_name': race_name,
@@ -124,7 +134,8 @@ class NetkeibaParser:
                 'track_condition': track_condition,
                 'weather': weather,
                 'race_class': race_class,
-                'grade': grade
+                'grade': grade,
+                'race_number': race_number
             }
 
         except Exception as e:
@@ -460,19 +471,40 @@ class NetkeibaParser:
     @staticmethod
     def parse_horse_pedigree(html: str, horse_id: str) -> Dict[str, Any]:
         """
-        馬の血統情報をパース
+        馬の血統情報と基本情報をパース
 
         Args:
             html: 馬詳細ページのHTML
             horse_id: 馬ID
 
         Returns:
-            血統情報の辞書
+            血統情報と基本情報の辞書
         """
         soup = BeautifulSoup(html, 'lxml')
         pedigree = {}
 
         try:
+            # 生年月日を探す（プロフィールテーブルから）
+            # 例: <tr><th>生年月日</th><td>2018年3月15日</td></tr>
+            profile_table = soup.find('table', summary='のプロフィール')
+            if not profile_table:
+                # 別の方法で探す
+                profile_table = soup.find('table', class_='db_prof_table')
+
+            if profile_table:
+                rows = profile_table.find_all('tr')
+                for row in rows:
+                    th = row.find('th')
+                    td = row.find('td')
+                    if th and td:
+                        if '生年月日' in th.text or '生年' in th.text:
+                            # 日付を抽出（例: "2018年3月15日" -> "2018-03-15"）
+                            birth_text = td.text.strip()
+                            date_match = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日', birth_text)
+                            if date_match:
+                                year, month, day = date_match.groups()
+                                pedigree['birth_date'] = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+
             # 血統テーブルを探す
             pedigree_table = soup.find('table', class_='blood_table')
             if pedigree_table:
@@ -496,6 +528,8 @@ class NetkeibaParser:
 
         except Exception as e:
             print(f"血統情報パースエラー: {e}")
+            import traceback
+            traceback.print_exc()
 
         return pedigree
 
@@ -809,36 +843,59 @@ class NetkeibaParser:
 
             rows = lap_table.find_all('tr')
             lap_row = None
+            pace_row = None
 
-            # 「ラップ」行を探す
+            # 「ラップ」行と「ペース」行を探す
             for row in rows:
                 th = row.find('th')
-                if th and 'ラップ' in th.text:
-                    lap_row = row
-                    break
+                if th:
+                    if 'ラップ' in th.text:
+                        lap_row = row
+                    elif 'ペース' in th.text:
+                        pace_row = row
 
             if not lap_row:
                 return lap_times
 
             # ラップタイムのセルを取得
-            td = lap_row.find('td', class_='race_lap_cell')
-            if not td:
+            lap_td = lap_row.find('td', class_='race_lap_cell')
+            if not lap_td:
                 return lap_times
 
             # ラップタイムを「-」で分割
-            lap_text = td.text.strip()
+            lap_text = lap_td.text.strip()
             lap_values = [lap.strip() for lap in lap_text.split('-')]
+
+            # ペース情報を取得（存在する場合）
+            pace_values = []
+            if pace_row:
+                pace_td = pace_row.find('td', class_='race_lap_cell')
+                if pace_td:
+                    # ペース情報から最後の括弧部分を除外
+                    # 例: "12.1 - 23.0 - 34.1 - 45.6 - 57.1 - 69.1 - 80.6 - 92.5 (34.1-35.4)"
+                    pace_text = pace_td.text.strip()
+                    # 括弧の前までを取得
+                    pace_text = re.sub(r'\s*\([^)]*\)', '', pace_text)
+                    pace_values = [pace.strip() for pace in pace_text.split('-')]
 
             # 各区間のラップタイムをデータベース用に変換
             # section: 1=0-200m, 2=200-400m, 3=400-600m...
             for section, lap_value in enumerate(lap_values, start=1):
                 try:
                     lap_time_float = float(lap_value)
+                    # 対応するペース値を取得（存在する場合）
+                    pace_value = None
+                    if section <= len(pace_values):
+                        try:
+                            pace_value = float(pace_values[section - 1])
+                        except ValueError:
+                            pass
+
                     lap_times.append({
                         'race_id': race_id,
                         'section': section,
                         'lap_time': lap_time_float,
-                        'pace': None  # ペース分類は現状未使用
+                        'pace': pace_value
                     })
                 except ValueError:
                     print(f"WARNING: Failed to parse lap time: '{lap_value}' for section {section}")
