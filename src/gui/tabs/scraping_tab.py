@@ -12,7 +12,7 @@ from PyQt6.QtCore import QDate, QThread, pyqtSignal
 from datetime import datetime
 
 from src.scraper.scraping_worker import ScrapingWorker
-from src.config import Config
+from src.utils.config import Config
 
 
 class ScrapingTab(QWidget):
