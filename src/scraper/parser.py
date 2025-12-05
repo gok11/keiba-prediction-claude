@@ -114,6 +114,15 @@ class NetkeibaParser:
             elif '新馬' in race_name or '新馬' in race_data_text:
                 race_class = "新馬"
 
+            # レース番号をrace_idの最後2桁から抽出
+            # 例: 201506010102 → 02 → レース番号2
+            race_number = None
+            if race_id and len(race_id) >= 2:
+                try:
+                    race_number = int(race_id[-2:])
+                except ValueError:
+                    pass
+
             return {
                 'race_id': race_id,
                 'race_name': race_name,
@@ -124,7 +133,8 @@ class NetkeibaParser:
                 'track_condition': track_condition,
                 'weather': weather,
                 'race_class': race_class,
-                'grade': grade
+                'grade': grade,
+                'race_number': race_number
             }
 
         except Exception as e:
@@ -408,14 +418,26 @@ class NetkeibaParser:
                             print(f"DEBUG: Failed to parse payout amount: '{payout_text}'")
                             continue
 
-                    # 人気
-                    popularity = None
+                    # 人気 - 複数ある場合は<br>で区切られている
+                    popularities = []
                     if len(tds) > 2:
-                        popularity_text = tds[2].text.strip().replace('番人気', '')
-                        try:
-                            popularity = int(popularity_text)
-                        except:
-                            pass
+                        popularity_td = tds[2]
+                        if popularity_td.find('br'):
+                            # <br>で区切られている場合
+                            for text in popularity_td.stripped_strings:
+                                text = text.strip().replace('番人気', '')
+                                if text:
+                                    try:
+                                        popularities.append(int(text))
+                                    except:
+                                        pass
+                        else:
+                            # 単一の人気
+                            popularity_text = popularity_td.text.strip().replace('番人気', '')
+                            try:
+                                popularities.append(int(popularity_text))
+                            except:
+                                pass
 
                     # 組み合わせと払戻金額が同じ数だけあることを確認
                     if len(combinations) != len(payout_amounts):
@@ -425,9 +447,16 @@ class NetkeibaParser:
                         # 数が合わない場合はスキップ
                         continue
 
+                    # 人気の数を調整（人気が1つだけの場合は全ての組み合わせで共有）
+                    if len(popularities) == 1:
+                        popularities = popularities * len(combinations)
+                    elif len(popularities) != len(combinations):
+                        # 人気の数が合わない場合はNoneで埋める
+                        popularities = [None] * len(combinations)
+
                     # 各組み合わせと払戻金のペアを個別のエントリとして追加
-                    for combination, payout_amount in zip(combinations, payout_amounts):
-                        print(f"DEBUG: Parsed payout - type: '{payout_type}', combination: '{combination}', amount: {payout_amount}")
+                    for combination, payout_amount, popularity in zip(combinations, payout_amounts, popularities):
+                        print(f"DEBUG: Parsed payout - type: '{payout_type}', combination: '{combination}', amount: {payout_amount}, popularity: {popularity}")
                         payouts.append({
                             'race_id': race_id,
                             'payout_type': payout_type,
@@ -856,13 +885,16 @@ class NetkeibaParser:
 
             rows = lap_table.find_all('tr')
             lap_row = None
+            pace_row = None
 
-            # 「ラップ」行を探す
+            # 「ラップ」行と「ペース」行を探す
             for row in rows:
                 th = row.find('th')
-                if th and 'ラップ' in th.text:
-                    lap_row = row
-                    break
+                if th:
+                    if 'ラップ' in th.text:
+                        lap_row = row
+                    elif 'ペース' in th.text:
+                        pace_row = row
 
             if not lap_row:
                 return lap_times
@@ -876,16 +908,33 @@ class NetkeibaParser:
             lap_text = td.text.strip()
             lap_values = [lap.strip() for lap in lap_text.split('-')]
 
+            # ペース（累積時間）を取得
+            pace_values = []
+            if pace_row:
+                pace_td = pace_row.find('td', class_='race_lap_cell')
+                if pace_td:
+                    pace_text = pace_td.text.strip()
+                    pace_values = [pace.strip() for pace in pace_text.split('-')]
+
             # 各区間のラップタイムをデータベース用に変換
             # section: 1=0-200m, 2=200-400m, 3=400-600m...
             for section, lap_value in enumerate(lap_values, start=1):
                 try:
                     lap_time_float = float(lap_value)
+
+                    # ペース（累積時間）を取得
+                    pace_float = None
+                    if section <= len(pace_values):
+                        try:
+                            pace_float = float(pace_values[section - 1])
+                        except ValueError:
+                            pass
+
                     lap_times.append({
                         'race_id': race_id,
                         'section': section,
                         'lap_time': lap_time_float,
-                        'pace': None  # ペース分類は現状未使用
+                        'pace': pace_float  # 累積時間
                     })
                 except ValueError:
                     print(f"WARNING: Failed to parse lap time: '{lap_value}' for section {section}")

@@ -28,7 +28,7 @@ class HorseHistoryDialog(QDialog):
 
         # 馬の基本情報を取得
         horse_query = """
-        SELECT horse_name, birth_date, sex, sire, dam, damsire
+        SELECT horse_name, birth_date, sex, sire, dam, damsire, sire_sire, sire_dam, dam_dam
         FROM horses WHERE horse_id = ?
         """
         horse = self.db_manager.execute_query(horse_query, (self.horse_id,))
@@ -41,6 +41,9 @@ class HorseHistoryDialog(QDialog):
             sire = horse[3] if horse[3] else "---"
             dam = horse[4] if horse[4] else "---"
             damsire = horse[5] if horse[5] else "---"
+            sire_sire = horse[6] if horse[6] else "---"
+            sire_dam = horse[7] if horse[7] else "---"
+            dam_dam = horse[8] if horse[8] else "---"
 
             # 基本情報
             info_html = f"""
@@ -49,9 +52,14 @@ class HorseHistoryDialog(QDialog):
 <tr><td><b>馬ID:</b></td><td>{self.horse_id}</td></tr>
 <tr><td><b>生年月日:</b></td><td>{birth_date}</td></tr>
 <tr><td><b>性別:</b></td><td>{sex}</td></tr>
+<tr><td colspan="2"><b>--- 血統情報 ---</b></td></tr>
 <tr><td><b>父:</b></td><td>{sire}</td></tr>
 <tr><td><b>母:</b></td><td>{dam}</td></tr>
 <tr><td><b>母父:</b></td><td>{damsire}</td></tr>
+<tr><td colspan="2"><b>--- 祖父母 ---</b></td></tr>
+<tr><td><b>父父:</b></td><td>{sire_sire}</td></tr>
+<tr><td><b>父母:</b></td><td>{sire_dam}</td></tr>
+<tr><td><b>母母:</b></td><td>{dam_dam}</td></tr>
 </table>
 """
             info_label = QLabel(info_html)
