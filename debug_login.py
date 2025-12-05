@@ -95,6 +95,23 @@ if form:
             login_data[name] = value
             print(f"  追加: {name} = {value[:20] if value else ''}")
 
+# フォームのactionを確認し、POST先URLを決定
+form_action = form.get('action', '') if form else ''
+if form_action:
+    if form_action.startswith('http'):
+        post_url = form_action
+    elif form_action.startswith('/'):
+        # 絶対パス
+        post_url = f"https://regist.netkeiba.com{form_action}"
+    else:
+        # 相対パス
+        post_url = f"https://regist.netkeiba.com/account/{form_action}"
+    print(f"\n  フォームaction: {form_action}")
+    print(f"  POST先URL: {post_url}")
+else:
+    post_url = login_url
+    print(f"\n  フォームactionなし、デフォルトURL使用: {post_url}")
+
 print(f"\n  POSTデータ:")
 for key, value in login_data.items():
     if key == 'pswd':
@@ -103,24 +120,43 @@ for key, value in login_data.items():
         print(f"    {key}: {value}")
 
 try:
-    response = session.post(login_url, data=login_data, timeout=30, allow_redirects=True)
+    response = session.post(post_url, data=login_data, timeout=30, allow_redirects=True)
     response.encoding = 'euc-jp'
     print(f"\n  ステータスコード: {response.status_code}")
     print(f"  最終URL: {response.url}")
 
+    # リダイレクト履歴を表示
+    if response.history:
+        print(f"\n  リダイレクト履歴:")
+        for idx, hist in enumerate(response.history):
+            print(f"    {idx + 1}. {hist.status_code} -> {hist.url}")
+
     # Cookieを確認
     print(f"\n  取得したCookie:")
     for cookie in session.cookies:
-        print(f"    {cookie.name} = {cookie.value[:20]}...")
+        print(f"    {cookie.name} = {cookie.value[:20]}... (domain: {cookie.domain}, path: {cookie.path})")
 
     # レスポンスにエラーメッセージがないか確認
-    if 'ログインID' in response.text and 'パスワード' in response.text:
-        print("  ⚠️ まだログインページにいる可能性があります")
-    if 'ログインに失敗' in response.text or 'エラー' in response.text:
-        print("  ❌ ログインエラーメッセージを検出")
+    error_patterns = [
+        ('ログインページ', 'ログインID' in response.text and 'パスワード' in response.text),
+        ('ログイン失敗', 'ログインに失敗' in response.text),
+        ('エラー', 'エラー' in response.text and 'ログイン' in response.text),
+        ('認証失敗', '認証' in response.text and '失敗' in response.text),
+    ]
+
+    for name, found in error_patterns:
+        if found:
+            print(f"  ⚠️ {name}メッセージを検出")
+
+    # ログイン後のページを保存
+    with open('debug_login_response.html', 'w', encoding='utf-8') as f:
+        f.write(response.text)
+    print(f"\n  → debug_login_response.htmlに保存しました")
 
 except Exception as e:
     print(f"  ❌ エラー: {e}")
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
 
 # ステップ3: プレミアムページにアクセス
@@ -131,28 +167,58 @@ try:
     test_response.encoding = 'euc-jp'
     print(f"  ステータスコード: {test_response.status_code}")
 
-    # プレミアム情報の確認
+    # プレミアム情報の確認（実際の数値データがあるかをチェック）
+    import re
+
+    # 馬場指数の実データを探す（例: "馬場指数 2.5" のようなパターン）
+    track_index_pattern = r'馬場指数[^\d]*(\d+\.?\d*)'
+    track_index_match = re.search(track_index_pattern, test_response.text)
+    has_track_index_data = track_index_match is not None
+
+    # タイム指数の実データを探す
+    time_index_pattern = r'タイム指数[^\d]*(\d+\.?\d*)'
+    time_index_match = re.search(time_index_pattern, test_response.text)
+    has_time_index_data = time_index_match is not None
+
+    # エラーメッセージの確認
+    has_premium_error = 'プレミアムサービス' in test_response.text or 'プレミアム会員限定' in test_response.text
+
     checks = {
-        '馬場指数': '馬場指数' in test_response.text,
-        'タイム指数': 'タイム指数' in test_response.text,
-        'プレミアムサービス': 'プレミアムサービス' in test_response.text,
-        'プレミアム会員限定': 'プレミアム会員限定' in test_response.text,
+        '馬場指数（実データ）': has_track_index_data,
+        'タイム指数（実データ）': has_time_index_data,
+        'プレミアムエラーメッセージ': has_premium_error,
     }
 
     print("\n  ページ内容の確認:")
     for key, found in checks.items():
-        status = "✅" if (found and '指数' in key) or (not found and 'プレミアム' in key) else "❌"
-        print(f"    {status} {key}: {'検出' if found else '未検出'}")
+        if 'エラー' in key:
+            status = "✅" if not found else "❌"
+            print(f"    {status} {key}: {'検出' if found else '未検出'}")
+        else:
+            status = "✅" if found else "❌"
+            print(f"    {status} {key}: {'検出' if found else '未検出'}")
+            if found:
+                if '馬場指数' in key and track_index_match:
+                    print(f"        値: {track_index_match.group(1)}")
+                elif 'タイム指数' in key and time_index_match:
+                    print(f"        値: {time_index_match.group(1)}")
 
     # デバッグ用にページを保存
     with open('debug_race_page.html', 'w', encoding='utf-8') as f:
         f.write(test_response.text)
     print("\n  → debug_race_page.htmlに保存しました")
 
+    # デバッグ用に一部を表示
+    if has_premium_error:
+        print("\n  エラーメッセージ周辺のコンテキスト:")
+        error_context = re.search(r'.{50}プレミアム[サービス会員限定]{0,10}.{50}', test_response.text)
+        if error_context:
+            print(f"    ...{error_context.group(0)}...")
+
     # 判定
-    if checks['馬場指数'] or checks['タイム指数']:
-        print("\n✅ ログイン成功！プレミアム情報にアクセスできます")
-    elif checks['プレミアムサービス'] or checks['プレミアム会員限定']:
+    if has_track_index_data or has_time_index_data:
+        print("\n✅ ログイン成功！プレミアム情報の実データにアクセスできます")
+    elif has_premium_error:
         print("\n❌ ログイン失敗：プレミアム会員限定メッセージが表示されています")
     else:
         print("\n⚠️ 不明：プレミアム情報が見つかりませんが、エラーメッセージもありません")

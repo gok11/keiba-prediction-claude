@@ -177,20 +177,30 @@ class NetkeibaScraper:
             test_response = self.session.get(test_race_url, timeout=self.timeout)
             test_response.encoding = 'euc-jp'
 
-            # プレミアム会員限定のメッセージがないか確認
-            if 'プレミアムサービス' in test_response.text or 'プレミアム会員限定' in test_response.text:
-                self.is_logged_in = False
-                self.logger.warning("ログインに失敗しました（プレミアム情報にアクセスできません）")
-                return False
+            # プレミアム情報の実データを探す（数値が含まれているか）
+            import re
+            track_index_pattern = r'馬場指数[^\d]*(\d+\.?\d*)'
+            time_index_pattern = r'タイム指数[^\d]*(\d+\.?\d*)'
+            has_track_index = re.search(track_index_pattern, test_response.text) is not None
+            has_time_index = re.search(time_index_pattern, test_response.text) is not None
 
-            # 馬場指数やタイム指数などのプレミアム情報が含まれているか確認
-            if '馬場指数' in test_response.text or 'タイム指数' in test_response.text:
+            # プレミアム会員限定のエラーメッセージがあるか確認
+            has_premium_error = 'プレミアムサービス' in test_response.text or 'プレミアム会員限定' in test_response.text
+
+            # 実データがあればログイン成功
+            if has_track_index or has_time_index:
                 self.is_logged_in = True
                 self.logger.info("ログイン成功（プレミアム情報へのアクセスを確認）")
                 return True
-            else:
+            # エラーメッセージがあればログイン失敗
+            elif has_premium_error:
                 self.is_logged_in = False
-                self.logger.warning("ログインに失敗した可能性があります（プレミアム情報が見つかりません）")
+                self.logger.warning("ログインに失敗しました（プレミアム会員限定メッセージが表示されています）")
+                return False
+            else:
+                # どちらでもない場合（判定不能）
+                self.is_logged_in = False
+                self.logger.warning("ログイン状態を確認できません（プレミアム情報もエラーメッセージも見つかりません）")
                 return False
 
         except Exception as e:
