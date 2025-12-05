@@ -460,42 +460,85 @@ class NetkeibaParser:
     @staticmethod
     def parse_horse_pedigree(html: str, horse_id: str) -> Dict[str, Any]:
         """
-        馬の血統情報をパース
+        馬の血統情報と基本情報をパース（馬詳細ページから）
 
         Args:
             html: 馬詳細ページのHTML
             horse_id: 馬ID
 
         Returns:
-            血統情報の辞書
+            血統情報と基本情報の辞書（sire, dam, damsire, birth_date）
         """
         soup = BeautifulSoup(html, 'lxml')
         pedigree = {}
 
         try:
-            # 血統テーブルを探す
-            pedigree_table = soup.find('table', class_='blood_table')
-            if pedigree_table:
-                # 父
-                father = pedigree_table.find('td', class_='father')
-                if father:
-                    father_link = father.find('a')
-                    pedigree['sire'] = father_link.text.strip() if father_link else ""
+            # 生年月日を取得（プロフィールテーブルから）
+            # <table summary="のプロフィール">
+            profile_table = soup.find('table', summary=lambda x: x and 'プロフィール' in x)
+            if profile_table:
+                rows = profile_table.find_all('tr')
+                for row in rows:
+                    th = row.find('th')
+                    td = row.find('td')
+                    if th and td and '生年月日' in th.text:
+                        birth_text = td.text.strip()
+                        # 例: "2012年3月8日"
+                        date_match = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日', birth_text)
+                        if date_match:
+                            year, month, day = date_match.groups()
+                            pedigree['birth_date'] = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                        break
 
-                # 母
-                mother = pedigree_table.find('td', class_='mother')
-                if mother:
-                    mother_link = mother.find('a')
-                    pedigree['dam'] = mother_link.text.strip() if mother_link else ""
+            # 血統表を取得（簡易血統表）
+            # <table class="blood_table">
+            # 注: 詳細ページは "blood_table detail" だが、馬詳細ページは "blood_table" のみ
+            blood_table = soup.find('table', class_='blood_table')
+            if blood_table:
+                # 全てのtdセルを取得
+                cells = blood_table.find_all('td')
 
-                # 母父
-                damsire = pedigree_table.find('td', class_='damsire')
-                if damsire:
-                    damsire_link = damsire.find('a')
-                    pedigree['damsire'] = damsire_link.text.strip() if damsire_link else ""
+                # rowspan="2" のセルを探す（父と母）
+                rowspan_2_cells = [cell for cell in cells if cell.get('rowspan') == '2']
+
+                # 父: 最初の rowspan="2" かつ class="b_ml"
+                for cell in rowspan_2_cells:
+                    if 'b_ml' in cell.get('class', []):
+                        link = cell.find('a')
+                        if link:
+                            # span要素内のテキストを取得、なければaタグ直下のテキスト
+                            span = link.find('span')
+                            pedigree['sire'] = span.text.strip() if span else link.text.strip()
+                        break
+
+                # 母: 最初の rowspan="2" かつ class="b_fml"
+                for cell in rowspan_2_cells:
+                    if 'b_fml' in cell.get('class', []):
+                        link = cell.find('a')
+                        if link:
+                            span = link.find('span')
+                            pedigree['dam'] = span.text.strip() if span else link.text.strip()
+                        break
+
+                # 母父: 母の後の class="b_ml" のセル（rowspan属性なしまたは1）
+                # 構造: 母(rowspan=2) の次の行に母父がある
+                dam_found = False
+                for cell in cells:
+                    if dam_found and 'b_ml' in cell.get('class', []) and cell.get('rowspan') != '2':
+                        link = cell.find('a')
+                        if link:
+                            span = link.find('span')
+                            pedigree['damsire'] = span.text.strip() if span else link.text.strip()
+                        break
+
+                    # 母を見つけた
+                    if 'b_fml' in cell.get('class', []) and cell.get('rowspan') == '2':
+                        dam_found = True
 
         except Exception as e:
             print(f"血統情報パースエラー: {e}")
+            import traceback
+            traceback.print_exc()
 
         return pedigree
 
