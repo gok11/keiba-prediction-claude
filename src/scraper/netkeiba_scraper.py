@@ -152,10 +152,14 @@ class NetkeibaScraper:
             login_page.encoding = 'euc-jp'
 
             # ログイン情報をPOST
+            # デバッグで判明した必要なhiddenフィールドを含める
             login_data = {
+                'pid': 'login',
+                'action': 'auth',
+                'return_url2': '',
+                'mem_tp': '',
                 'login_id': self.username,
                 'pswd': self.password,
-                'redirect_url': '',
             }
 
             response = self.session.post(
@@ -167,13 +171,47 @@ class NetkeibaScraper:
             response.encoding = 'euc-jp'
 
             # ログイン成功の確認（プレミアム会員ページにアクセスできるか）
-            # memberRank: 'Premium' がHTMLに含まれているかで判定
-            if 'Premium' in response.text or 'memberRank' in response.text:
+            # より厳密な確認：実際にプレミアム情報が含まれるページにアクセス
+            # テストレースページにアクセスして、プレミアム情報が取得できるか確認
+            test_race_url = "https://db.netkeiba.com/race/202408030211/"  # 既知のレース
+            test_response = self.session.get(test_race_url, timeout=self.timeout)
+            test_response.encoding = 'euc-jp'
+
+            # プレミアム情報の実データを探す（数値が含まれているか）
+            import re
+            # 馬場指数はマイナス値もあるので-?を追加
+            track_index_pattern = r'馬場指数[^\d\-]*(-?\d+\.?\d*)'
+            # タイム指数はHTMLで「ﾀｲﾑ指数」と半角カタカナで表示されているため、
+            # speed_indexクラスを持つtdタグから数値を抽出
+            time_index_pattern = r'<td[^>]*class="[^"]*speed_index[^"]*"[^>]*>\s*(\d+)\s*</td>'
+            has_track_index = re.search(track_index_pattern, test_response.text) is not None
+            has_time_index = re.search(time_index_pattern, test_response.text) is not None
+
+            # プレミアム会員限定のエラーメッセージがあるか確認
+            # より具体的なパターンで誤検出を防ぐ（フッターの「プレミアムサービスのご案内」などは除外）
+            error_patterns = [
+                'プレミアムサービスにご登録',
+                'プレミアム会員限定の情報',
+                'プレミアムコンテンツです',
+                'プレミアム会員のみ',
+                'プレミアムサービスへの登録が必要',
+            ]
+            has_premium_error = any(pattern in test_response.text for pattern in error_patterns)
+
+            # 実データがあればログイン成功
+            if has_track_index or has_time_index:
                 self.is_logged_in = True
-                self.logger.info("ログイン成功")
+                self.logger.info("ログイン成功（プレミアム情報へのアクセスを確認）")
                 return True
+            # エラーメッセージがあればログイン失敗
+            elif has_premium_error:
+                self.is_logged_in = False
+                self.logger.warning("ログインに失敗しました（プレミアム会員限定メッセージが表示されています）")
+                return False
             else:
-                self.logger.warning("ログインに失敗した可能性があります")
+                # どちらでもない場合（判定不能）
+                self.is_logged_in = False
+                self.logger.warning("ログイン状態を確認できません（プレミアム情報もエラーメッセージも見つかりません）")
                 return False
 
         except Exception as e:
@@ -311,6 +349,7 @@ class NetkeibaScraper:
                 sire = None
                 dam = None
                 damsire = None
+                birth_date = None
 
                 if fetch_pedigree and result.get('horse_id'):
                     pedigree = self.scrape_horse_pedigree(result['horse_id'])
@@ -318,13 +357,14 @@ class NetkeibaScraper:
                         sire = pedigree.get('sire')
                         dam = pedigree.get('dam')
                         damsire = pedigree.get('damsire')
+                        birth_date = pedigree.get('birth_date')
 
                 # 馬情報を保存
                 horse_data = {
                     'horse_id': result['horse_id'],
                     'horse_name': result['horse_name'],
                     'sex': result.get('sex'),
-                    'birth_date': None,  # 詳細ページから取得が必要
+                    'birth_date': birth_date,
                     'sire': sire,
                     'dam': dam,
                     'damsire': damsire,

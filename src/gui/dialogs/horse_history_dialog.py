@@ -96,7 +96,7 @@ class HorseHistoryDialog(QDialog):
                 distance = f"{row_data[3]}m" if row_data[3] else ""
                 track = row_data[4] if row_data[4] else ""
                 pos = str(row_data[6]) if row_data[6] else ""
-                time = row_data[7] if row_data[7] else ""
+                time = str(row_data[7]) if row_data[7] else ""
                 jockey = row_data[8] if row_data[8] else ""
                 pop = str(row_data[9]) if row_data[9] else ""
                 odds = f"{row_data[10]:.1f}" if row_data[10] else ""
@@ -148,10 +148,10 @@ class HorseHistoryDialog(QDialog):
 
         # 厩舎コメントを取得
         comment_query = """
-        SELECT sc.comment_date, sc.training_comment
+        SELECT sc.created_at, sc.comment
         FROM stable_comments sc
         WHERE sc.horse_id = ?
-        ORDER BY sc.comment_date DESC
+        ORDER BY sc.created_at DESC
         LIMIT 5
         """
         comments = self.db_manager.execute_query(comment_query, (self.horse_id,))

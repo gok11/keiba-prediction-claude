@@ -12,6 +12,7 @@ from PyQt6.QtCore import QDate, QThread, pyqtSignal
 from datetime import datetime
 
 from src.scraper.scraping_worker import ScrapingWorker
+from src.utils.config import Config
 
 
 class ScrapingTab(QWidget):
@@ -21,7 +22,9 @@ class ScrapingTab(QWidget):
         super().__init__()
         self.db_manager = db_manager
         self.scraping_thread = None
+        self.config = Config()
         self.init_ui()
+        self.load_settings()
 
     def init_ui(self):
         """UIの初期化"""
@@ -226,3 +229,45 @@ class ScrapingTab(QWidget):
         """ログにメッセージを追加"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.log_text.append(f"[{timestamp}] {message}")
+    def load_settings(self):
+        """保存された設定を読み込む"""
+        try:
+            # 期間設定の読み込み
+            start_date_str = self.config.get('scraping.start_date', '2020-01-01')
+            end_date_str = self.config.get('scraping.end_date', QDate.currentDate().toString('yyyy-MM-dd'))
+            
+            start_date = QDate.fromString(start_date_str, 'yyyy-MM-dd')
+            end_date = QDate.fromString(end_date_str, 'yyyy-MM-dd')
+            
+            if start_date.isValid():
+                self.start_date.setDate(start_date)
+            if end_date.isValid():
+                self.end_date.setDate(end_date)
+            
+            # スリープ時間の読み込み
+            sleep_min = self.config.get('scraping.sleep_min', 2.0)
+            sleep_max = self.config.get('scraping.sleep_max', 5.0)
+            
+            self.sleep_min.setValue(sleep_min)
+            self.sleep_max.setValue(sleep_max)
+            
+            # 値が変更されたときに保存するように接続
+            self.start_date.dateChanged.connect(self.save_settings)
+            self.end_date.dateChanged.connect(self.save_settings)
+            self.sleep_min.valueChanged.connect(self.save_settings)
+            self.sleep_max.valueChanged.connect(self.save_settings)
+            
+        except Exception:
+            # 読み込みに失敗してもデフォルト値で続行
+            pass
+    
+    def save_settings(self):
+        """設定を保存する"""
+        try:
+            self.config.set('scraping.start_date', self.start_date.date().toString('yyyy-MM-dd'))
+            self.config.set('scraping.end_date', self.end_date.date().toString('yyyy-MM-dd'))
+            self.config.set('scraping.sleep_min', self.sleep_min.value())
+            self.config.set('scraping.sleep_max', self.sleep_max.value())
+        except Exception:
+            # 保存に失敗してもエラーは無視（次回保存時に再試行）
+            pass
