@@ -183,8 +183,16 @@ try:
     time_index_match = re.search(time_index_pattern, test_response.text)
     has_time_index_data = time_index_match is not None
 
-    # エラーメッセージの確認
-    has_premium_error = 'プレミアムサービス' in test_response.text or 'プレミアム会員限定' in test_response.text
+    # エラーメッセージの確認（より具体的なパターンで誤検出を防ぐ）
+    # フッターの「プレミアムサービスのご案内」などは除外
+    error_patterns = [
+        'プレミアムサービスにご登録',
+        'プレミアム会員限定の情報',
+        'プレミアムコンテンツです',
+        'プレミアム会員のみ',
+        'プレミアムサービスへの登録が必要',
+    ]
+    has_premium_error = any(pattern in test_response.text for pattern in error_patterns)
 
     checks = {
         '馬場指数（実データ）': has_track_index_data,

@@ -188,7 +188,15 @@ class NetkeibaScraper:
             has_time_index = re.search(time_index_pattern, test_response.text) is not None
 
             # プレミアム会員限定のエラーメッセージがあるか確認
-            has_premium_error = 'プレミアムサービス' in test_response.text or 'プレミアム会員限定' in test_response.text
+            # より具体的なパターンで誤検出を防ぐ（フッターの「プレミアムサービスのご案内」などは除外）
+            error_patterns = [
+                'プレミアムサービスにご登録',
+                'プレミアム会員限定の情報',
+                'プレミアムコンテンツです',
+                'プレミアム会員のみ',
+                'プレミアムサービスへの登録が必要',
+            ]
+            has_premium_error = any(pattern in test_response.text for pattern in error_patterns)
 
             # 実データがあればログイン成功
             if has_track_index or has_time_index:
