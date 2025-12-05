@@ -152,10 +152,14 @@ class NetkeibaScraper:
             login_page.encoding = 'euc-jp'
 
             # ログイン情報をPOST
+            # デバッグで判明した必要なhiddenフィールドを含める
             login_data = {
+                'pid': 'login',
+                'action': 'auth',
+                'return_url2': '',
+                'mem_tp': '',
                 'login_id': self.username,
                 'pswd': self.password,
-                'redirect_url': '',
             }
 
             response = self.session.post(
