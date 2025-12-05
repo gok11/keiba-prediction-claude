@@ -179,8 +179,11 @@ class NetkeibaScraper:
 
             # プレミアム情報の実データを探す（数値が含まれているか）
             import re
-            track_index_pattern = r'馬場指数[^\d]*(\d+\.?\d*)'
-            time_index_pattern = r'タイム指数[^\d]*(\d+\.?\d*)'
+            # 馬場指数はマイナス値もあるので-?を追加
+            track_index_pattern = r'馬場指数[^\d\-]*(-?\d+\.?\d*)'
+            # タイム指数はHTMLで「ﾀｲﾑ指数」と半角カタカナで表示されているため、
+            # speed_indexクラスを持つtdタグから数値を抽出
+            time_index_pattern = r'<td[^>]*class="[^"]*speed_index[^"]*"[^>]*>\s*(\d+)\s*</td>'
             has_track_index = re.search(track_index_pattern, test_response.text) is not None
             has_time_index = re.search(time_index_pattern, test_response.text) is not None
 

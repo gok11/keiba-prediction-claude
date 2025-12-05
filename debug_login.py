@@ -63,9 +63,10 @@ try:
             login_form = form
             print(f"    → これがログインフォームです！")
 
-    # ページの一部を保存
+    # ページの一部を保存（metaタグのcharsetをutf-8に修正）
+    html_content = login_page.text.replace('charset=euc-jp', 'charset=utf-8')
     with open('debug_login_page.html', 'w', encoding='utf-8') as f:
-        f.write(login_page.text)
+        f.write(html_content)
     print(f"\n  → debug_login_page.htmlに保存しました")
 
     if not login_form:
@@ -148,9 +149,10 @@ try:
         if found:
             print(f"  ⚠️ {name}メッセージを検出")
 
-    # ログイン後のページを保存
+    # ログイン後のページを保存（metaタグのcharsetをutf-8に修正）
+    html_content = response.text.replace('charset=euc-jp', 'charset=utf-8')
     with open('debug_login_response.html', 'w', encoding='utf-8') as f:
-        f.write(response.text)
+        f.write(html_content)
     print(f"\n  → debug_login_response.htmlに保存しました")
 
 except Exception as e:
@@ -171,12 +173,13 @@ try:
     import re
 
     # 馬場指数の実データを探す（例: "馬場指数 2.5" のようなパターン）
-    track_index_pattern = r'馬場指数[^\d]*(\d+\.?\d*)'
+    track_index_pattern = r'馬場指数[^\d]*(-?\d+\.?\d*)'
     track_index_match = re.search(track_index_pattern, test_response.text)
     has_track_index_data = track_index_match is not None
 
-    # タイム指数の実データを探す
-    time_index_pattern = r'タイム指数[^\d]*(\d+\.?\d*)'
+    # タイム指数の実データを探す（HTMLでは「ﾀｲﾑ指数」と半角カタカナで表示されている）
+    # レース結果テーブルから、speed_indexクラスを持つtdタグ内の数値を探す
+    time_index_pattern = r'<td[^>]*class="[^"]*speed_index[^"]*"[^>]*>\s*(\d+)\s*</td>'
     time_index_match = re.search(time_index_pattern, test_response.text)
     has_time_index_data = time_index_match is not None
 
@@ -203,9 +206,10 @@ try:
                 elif 'タイム指数' in key and time_index_match:
                     print(f"        値: {time_index_match.group(1)}")
 
-    # デバッグ用にページを保存
+    # デバッグ用にページを保存（metaタグのcharsetをutf-8に修正）
+    html_content = test_response.text.replace('charset=euc-jp', 'charset=utf-8')
     with open('debug_race_page.html', 'w', encoding='utf-8') as f:
-        f.write(test_response.text)
+        f.write(html_content)
     print("\n  → debug_race_page.htmlに保存しました")
 
     # デバッグ用に一部を表示
