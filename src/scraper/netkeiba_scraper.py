@@ -209,13 +209,17 @@ class NetkeibaScraper:
         """
         馬の血統情報をスクレイピング
 
+        血統詳細ページ (/horse/ped/{horse_id}/) から取得
+        ※馬詳細ページの血統情報は動的ロードのため使用不可
+
         Args:
             horse_id: 馬ID
 
         Returns:
             血統情報の辞書
         """
-        url = urljoin(self.base_url, f"horse/{horse_id}/")
+        # 血統詳細ページから取得（静的HTMLで5代血統表が含まれる）
+        url = urljoin(self.base_url, f"horse/ped/{horse_id}/")
         html = self.fetch_url(url)
 
         if not html:

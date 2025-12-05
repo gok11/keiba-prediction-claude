@@ -25,7 +25,7 @@ load_dotenv()
 
 def fetch_horse_page(horse_id: str, save_html: bool = True):
     """
-    馬詳細ページを取得
+    馬の血統詳細ページを取得
 
     Args:
         horse_id: 馬ID
@@ -34,7 +34,8 @@ def fetch_horse_page(horse_id: str, save_html: bool = True):
     Returns:
         HTMLコンテンツ
     """
-    url = f"https://db.netkeiba.com/horse/{horse_id}/"
+    # 血統詳細ページを取得（静的HTMLで5代血統表が含まれる）
+    url = f"https://db.netkeiba.com/horse/ped/{horse_id}/"
 
     session = requests.Session()
     session.headers.update({
